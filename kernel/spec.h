@@ -21,14 +21,19 @@
 
 #define SPEC_MAX_BOARDS 8
 
+enum spec_names {
+	SPEC_NAME_FW,
+	SPEC_NAME_PROG,
+	SPEC_NAME_SUBMOD,
+	SPEC_NAMES,
+};
+
 /* Our device structure */
 struct spec_dev {
-	struct pci_driver	*pci_driver;
 	struct pci_dev		*pdev;
 	struct resource		*area[3];	/* bar 0, 2, 4 */
 	void			*remap[3];	/* ioremap of bar 0, 2, 4 */
-	char			*fw_name;
-	char			*elf_name;
+	char			*names[SPEC_NAMES];
 	char			*submod_name;
 	struct work_struct	work;
 	const struct firmware	*fw;
