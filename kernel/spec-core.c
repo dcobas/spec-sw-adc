@@ -13,12 +13,15 @@
 #include <linux/device.h>
 #include <linux/init.h>
 #include <linux/list.h>
+#include <linux/kmod.h>
 #include <linux/sched.h>
 #include <linux/ctype.h>
 #include <linux/pci.h>
 #include <linux/io.h>
+#include <asm/unaligned.h>
 
 #include "spec.h"
+#include "loader-ll.h"
 
 static char *spec_name = "%b";
 module_param_named(name, spec_name, charp, 0444);
@@ -31,9 +34,9 @@ module_param_named(name, spec_name, charp, 0444);
  * is the kernel module.
  * Example for device in bus 2, slot 0:
  * command: "insmod spec name=%b"
- * gateware: "spec-0002:0000.bin"
- * program: "spec-0002:0000-cpu.bin" -- will be .elf, hopefully
- * other module requested: "spec-0002:0000.ko"
+ * gateware: "spec-B0002.bin"
+ * program: "spec-B0002-cpu.bin" -- will be .elf, hopefully
+ * other module requested: "spec-B0002.ko"
  */
 static int spec_build_names(struct spec_dev *dev)
 {
@@ -44,7 +47,7 @@ static int spec_build_names(struct spec_dev *dev)
 	static char *templates[] = {
 		[SPEC_NAME_FW] = "spec-%s.bin",
 		[SPEC_NAME_PROG] = "spec-%s-cpu.bin", /* will be .elf */
-		[SPEC_NAME_SUBMOD] = "spec-%s.ko",
+		[SPEC_NAME_SUBMOD] = "spec-%s", /* .ko added by modprobe */
 	};
 
 	for (si = spec_name, so = basename; *si ; si++) {
@@ -55,20 +58,14 @@ static int spec_build_names(struct spec_dev *dev)
 			continue;
 		}
 		si++; /* eat '%' */
-		if (so - basename + 9 >= sizeof(basename))
+		if (so - basename + 5 >= sizeof(basename))
 			return -ENOSPC;
 		switch(*si) {
-		case 'P': /* PCI vendor:device */;
-			so += sprintf(so, "%04x:%04x",
-				pdev->vendor, pdev->device);
-			break;
-		case 'p': /* PCI subvendor:subdevice */;
-			so += sprintf(so, "%04x:%04x",
-				pdev->subsystem_vendor, pdev->subsystem_device);
-			break;
 		case 'b': /* BUS id */
-			so += sprintf(so, "%04x:%04x",
-				pdev->bus->number, pdev->devfn);
+			so += sprintf(so, "B%04x", pdev->bus->number);
+			break;
+		case 's': /* slot-fn id */
+			so += sprintf(so, "S%04x", pdev->devfn);
 			break;
 		case '%':
 			*so++ = '%';
@@ -80,7 +77,6 @@ static int spec_build_names(struct spec_dev *dev)
 	*so = '\0';
 	while (isspace(*--so))
 		*so = '\0';
-	printk("%s: basename is \"%s\"\n", __func__, basename);
 
 	/* build the actual things */
 	for (i = 0; i < SPEC_NAMES; i++)
@@ -88,10 +84,116 @@ static int spec_build_names(struct spec_dev *dev)
 	return 0;
 }
 
+/* Load the FPGA. This bases on loader-ll.c, a kernel/user space thing */
+static int spec_load_fpga(struct spec_dev *dev)
+{
+	const struct firmware *fw;
+	unsigned long j;
+	int i, err, wrote, done;
+
+	err = request_firmware(&fw, dev->names[SPEC_NAME_FW], &dev->pdev->dev);
+	if (err < 0)
+		return err;
+	pr_info("%s: got binary file \"%s\", %i (0x%x) bytes\n", __func__,
+		dev->names[SPEC_NAME_FW], fw->size, fw->size);
+
+	/* loader_low_level is designed to run from user space too */
+	wrote = loader_low_level(0 /* unused fd */,
+				 dev->remap[2], fw->data, fw->size);
+	j = jiffies + 2 * HZ;
+	/* Wait for DONE interrupt  */
+	while(!done) {
+		i = readl(dev->remap[2] + FCL_IRQ);
+		if (i & 0x8) {
+			printk("%s: done after %i writes\n", __func__,
+			       wrote);
+			done = 1;
+		} else if( (i & 0x4) && !done) {
+			printk("%s: error after %i writes\n", __func__,
+			       wrote);
+			err = -ETIMEDOUT;
+			goto out;
+		}
+
+		if (time_after(jiffies, j)) {
+			printk("%s: timeout after %i writes\n", __func__,
+			       wrote);
+			err = -ETIMEDOUT;
+			goto out;
+		}
+	}
+out:
+	release_firmware(fw);
+        return err;
+}
+
+static int spec_load_submodule(struct spec_dev *dev)
+{
+	int err;
+
+	err = request_module(dev->names[SPEC_NAME_SUBMOD]);
+	pr_info("%s: load \"%s\": %i\n", __func__,
+		dev->names[SPEC_NAME_SUBMOD], err);
+	return err;
+}
+
+int spec_load_lm32(struct spec_dev *dev)
+{
+	const struct firmware *fw;
+	int err, off;
+
+	err = request_firmware(&fw, dev->names[SPEC_NAME_PROG],
+			       &dev->pdev->dev);
+	if (err < 0)
+		return err;
+	pr_info("%s: got program file \"%s\", %i (0x%x) bytes\n", __func__,
+		dev->names[SPEC_NAME_PROG], fw->size, fw->size);
+
+	/* Reset the LM32 */
+	writel(1, dev->remap[0] + 0xE2000);
+
+	/* Copy stuff over */
+	for (off = 0; off < fw->size; off += 4) {
+		uint32_t datum;
+
+		datum = get_unaligned_be32(fw->data + off);
+		writel(datum, dev->remap[0] + 0x80000 + off);
+	}
+	/* Unreset the LM32 */
+	writel(0, dev->remap[0] + 0xE2000);
+
+	/* MSC */
+	pr_info("LM32 has been restarted\n");
+	release_firmware(fw);
+	return 0;
+}
+
+
 /* A procedure to load the three names */
 static int spec_load_files(struct spec_dev *dev)
 {
-	printk("%s: not implemented\n", __func__);
+	int err;
+
+	printk("%s\n", __func__);
+
+	/*
+	 * We need to load the three files and we are in process context
+	 * (god has said: Documentation/PCI/pci.txt)
+	 */
+	if ( (err = spec_load_fpga(dev)) < 0) {
+		dev_err(&dev->pdev->dev, "Can't load firwmare \"%s\" - %i\n",
+			dev->names[SPEC_NAME_FW], err);
+		return err;
+	}
+
+	if ( (err = spec_load_lm32(dev)) < 0 ) {
+		dev_warn(&dev->pdev->dev, "Can't load program \"%s\" - %i\n",
+			dev->names[SPEC_NAME_PROG], err);
+		/* continue anyways */
+	}
+	if ( (err = spec_load_submodule(dev)) < 0 )
+		dev_warn(&dev->pdev->dev, "Can't load submodule \"%s\" - %i\n",
+			dev->names[SPEC_NAME_SUBMOD], err);
 	return 0;
 }
 
@@ -103,7 +205,8 @@ static int spec_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	struct spec_dev *dev;
 	int i;
 
-	printk("%s\n", __func__);
+	printk("%s (device %04x:%04x)\n", __func__, pdev->bus->number,
+		pdev->devfn);
 	printk("%s: current %i (%s)\n", __func__, current->pid, current->comm);
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev)
@@ -154,8 +257,6 @@ static void spec_remove(struct pci_dev *pdev)
 	for (i = 0; i < SPEC_NAMES; i++)
 		kfree(dev->names[i]);
 	kfree(dev);
-
-	/* FIXME */
 }
 
 
