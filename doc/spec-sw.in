@@ -24,7 +24,6 @@
 
 @comment %**start of header
 @documentlanguage en
-@documentencoding ISO-8859-1
 @setfilename spec-sw.info
 @settitle spec-sw
 @iftex
@@ -35,12 +34,12 @@
 
 @setchapternewpage off
 
-@set update-month February 2012
+@set update-month March 2012
 
 @finalout
 
 @titlepage
-@title spec-sw
+@title SPEC Software Support
 @subtitle @value{update-month}
 @subtitle A driver for the SPEC card and its FMC modules
 @author Alessandro Rubini for CERN
@@ -56,13 +55,201 @@
 @node Top
 @top Introduction
 
+This is the manual for the SPEC device driver. SPEC is the @i{Simple
+PCI-Express Carrier} for FMC cards, developed at
+@url{http://www.ohwr.org/projects/spec}. This manual is part of the
+associated software project, hosted at
+@url{http://www.ohwr.org/projects/spec-sw}, whose @i{git} repository
+hosts the latest version.
+
+
 @menu
-* Examples::                    
+* The Core Driver::             
 @end menu
 
 @c ##########################################################################
-@node Examples
-@chapter Examples
+@node The Core Driver
+@chapter The Core Driver
+
+The core driver lives in the @i{kernel} subdirectory. Like the board
+itself, it is a carrier for sub-modules.
+
+@menu
+* Compiling the Driver::        
+* Driver Operation::            
+* Future Plans::                
+@end menu
+
+@c ==========================================================================
+@node Compiling the Driver
+@section Compiling the Drivers
+
+ To compile
+it, set the following variables in your environment:
+
+@table @code
+
+@item LINUX
+
+	The top directory of the kernel sources for the version you
+        are going to run the driver under. I'm testing mostly with 3.2,
+	but I at least compile-test back to 2.6.35.
+
+@item CROSS_COMPILE
+
+	If you are cross-compiling, you need to set this variable.
+	It is not usually needed for the PC, but if you are using
+        the @i{Powec} board, you'll most likely need this. It is not
+        needed if you compile for a different-sized PC (see below).
+
+@item ARCH
+
+	If you are cross-compiling, set this variable. Use @code{powerpc}
+        for the @i{Powec}, @code{x86-64} if you compile on a 32-bit PC
+        to run on a 64-bit PC and @code{i386} if you compile on a 64-bit
+        PC to run on a 32-bit PC.
+
+@end table
+
+To compile run ``@code{make}'' with the previous variables set.  To
+install run ``@code{make install} to install under
+@code{/lib/modules/3.2.0} (or other version-based directory).  You can
+set @code{INSTALL_MOD_PATH} to set a prefix before @code{/lib/modules}.
+For example, if your target computer's filesystem is mounted under
+@code{/mnt/target} you can run
+
+@example
+   make install INSTALL_MOD_PATH=/mnt/target
+@end example
+
+The modules are installed under the subdirectory @code{extra}. In
+the previous case your driver will end up in 
+
+@example
+   /mnt/target/lib/modules/3.2.0/extra/spec.ko
+@end example
+
+@c ==========================================================================
+@node Driver Operation
+@section Driver Operation
+
+The driver @code{spec.ko} will simply register itself as a PCI driver,
+using both the ``old'' vendor and device ID (the Gennum identifiers)
+and the new ones (CERN vendor and SPEC device).
+
+The kernel will call the @i{probe} method of the driver, which in
+turn perform the following actions:
+
+@itemize @bullet
+@item Program a @i{firmware} (or @i{gateware}) file in the FPGA
+@item Load program code for the internal CPU (if any)
+@item Load a sub-module for driving the FMC card (if any).
+@end itemize
+
+If the first step fails, nothing more is tried; the second and third
+steps are expected to fail (you may not run a CPU in the FPGA or you
+may have its program already included in the @i{gateware} file);
+similarly you may not need a sub-driver, because the card is
+stand-alone and needs no Linux driver.
+
+The three files being looked for are named like this, assuming here
+the card is seen under PCIe bus number 2:
+
+@table @code
+
+@item spec-B0002.bin
+
+	This is the name of the @i{gateware} file, which is looked-for
+        in @code{/lib/firmware} by the @i{hotplug} or @i{udev} program.
+
+@item spec-B0002-cpu.bin
+
+	This is the program code for the embedded CPU. Again, it must
+        live in @code{/lib/firmware}
+
+@item spec-B0002.ko
+
+	The kernel sub-module. It is loaded using @i{modprobe}, so
+        it should live in the same place where @code{spec.ko} is found.
+        Also, please run ``@code{depmod -a}'' after copying or renaming
+        the file
+
+@end table
+
+The central part of actual names of the three files is
+customizable. You can use the @code{name=} module parameter to change
+it.  The default value, ``@code{%b}'' expands to the bus number, as
+shown. This allows to differentiate between cards, and have different
+bitstreams and sub-drivers for each of them, according to the
+geographical placement in the host computer.
+
+The names being passed are using literally, with the exceptrion
+of the following three formats:
+
+@table @code
+
+@item %b
+
+	The bus number, expanded as @code{B%04x"}.
+
+@item %s
+
+	The @i{slot} and @i{function} composite number, expanded as
+        @code{S%04x}. Note that usually every PCIe mechanical slot is
+        seen as a separate bus number, so using @code{%s} is not generally
+        useful.
+
+@item %%
+
+	A literal @code{%}.
+
+@end table
+
+For example, I have two cards, fit in bus number 2 and 3. I prepared
+the files for the card in slot 3 but not for the one in slot 2; I
+receive the following messages when loading with the default name
+(@code{%b}).  Here the @code{0} and @code{-2} items are error codes (0
+means success):
+
+@smallexample
+    spec_probe (device 0002:0000)
+    spec 0000:02:00.0: Can't load firwmare "spec-B0002.bin" - -2
+    spec_probe (device 0003:0000)
+    spec_load_fpga: got binary file "spec-B0003.bin", 1484404 (0x16a674) bytes
+    spec_load_lm32: got program file "spec-B0003-cpu.bin", 49044 (0xbf94) bytes
+    LM32 has been restarted
+    spec_load_submodule: load "spec-B0003": 0
+@end smallexample
+
+The following messages are printed if I pass @code{name=pippo} (Italian for
+@i{foo}):
+
+@smallexample
+    spec_probe (device 0002:0000)
+    spec 0000:02:00.0: Can't load firwmare "spec-pippo.bin" - -2
+    spec_probe (device 0003:0000)
+    spec 0000:03:00.0: Can't load firwmare "spec-pippo.bin" - -2
+@end smallexample
+
+Please note that when a sub-module is loaded, it registers in the kernel
+with its real name, not the one you renamed it to.  For example,
+the output of @i{lsmod} in the former case shown above is as follows,
+even if the module has been loaded as @code{spec-B0003.ko}:
+
+@example
+    Module                  Size  Used by
+    spec                    3835  0
+    spec_fine_delay          421  0
+@end example
+
+
+@c ==========================================================================
+@node Future Plans
+@section Future Plans
+
+The SPEC driver should scan its own wishbone bus according to the
+self-description specification, that is being finalized these times,
+instead of using static file names.
 
 
 
