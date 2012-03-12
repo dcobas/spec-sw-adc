@@ -183,7 +183,7 @@ shown. This allows to differentiate between cards, and have different
 bitstreams and sub-drivers for each of them, according to the
 geographical placement in the host computer.
 
-The names being passed are using literally, with the exceptrion
+The names being passed are using literally, with the exception
 of the following three formats:
 
 @table @code
@@ -244,6 +244,50 @@ even if the module has been loaded as @code{spec-B0003.ko}:
 
 
 @c ==========================================================================
+@node How sub-modules work
+@section How sub-modules work
+
+@b{Warning:} this is still in flush, and I'm open to suggestions. The
+current implementation is really hackish and has a number of weak
+points if several boards are in use.
+
+When a sub-module is loaded, it can access the list of PCI devices
+managed by the spec. Such a list is really list, in the Linux sense.
+
+The sub-module is expected to identify its own cards and act
+accordingly.  The current implementation trivial, and is on show in
+@code{spec-wr-nic.o}. I won't document here because I hope it will
+change soon.
+
+This are the outstanding bugs that are begging to be fixed:
+
+@table @i
+@item The sub-module is loaded only once
+
+	If two cards request the same module, one only is loaded when
+        the first card is probed, and it may find an incomplete list
+        of cards. Adding a delay is a hack I won't do.
+
+@item Renaming doesn't really work
+
+	Modules register by name (the real name, not the file name),
+        so even if the module's file name is changed it won't re-load
+        (you get ``@code{File exists}'' error).
+
+@item Sub-modules are not told which spec to use
+
+	Even if there's one sub-module for each spec, you won't know
+        what card to use, because the module's own name may be different
+        from the file name. Even reading @code{dev->names[SPEC_NAME_SUBMOD]}
+        won't help
+
+@end table
+
+But this is the current status, and it works perfectly with one card
+and one sub-module. I'll think more about it -- again, suggestions
+are welcome.
+
+@c ==========================================================================
 @node Future Plans
 @section Future Plans
 
@@ -251,6 +295,116 @@ The SPEC driver should scan its own wishbone bus according to the
 self-description specification, that is being finalized these times,
 instead of using static file names.
 
+
+
+@c ##########################################################################
+@node The WR-NIC
+@chapter The WR-NIC
+
+To be written.
+
+@c ##########################################################################
+@node Tools
+@chapter Tools
+
+The @i{tools} subdirectory of this package includes a few host-side
+programs that may be useful while working with the SPEC device.
+
+The tools currently available are:
+
+@table @i
+
+@item specmem
+
+	The program acts like @i{devmem} or @i{devmem2} but in a
+        simplified way. It receives one or two command line arguments:
+        one for reading and two for writing. It makes a single 32-bit
+        access to BAR0 of the Gennum PCI bridge; the first argument is
+        the address, and the second argument is the value to be written.
+        The @code{VERBOSE} environment variable makes the tool slightly
+        more verbose.
+
+@item spec-cl
+
+	This is the @i{cpu loader}. It is not called @i{lm32-loader} to
+        avoid confusion with other tools we have been using. It
+        loads a program at offset 0x8000 in BAR0. This is where we
+        usually have RAM memory for the soft-core running in the SPEC.
+        The program also keeps the soft-core in reset state during the
+        load operation, so the new program will be run after loading
+        is over.
+
+@end table
+
+Currently, the tools only work with one SPEC card (i.e., if you have
+two of them installed in your system, they work with one of them only
+-- the first one appearing in @i{lspci}).  This will be fixed in later
+versions, using command-line options or environment variables.
+
+Use of these programs is exemplified in @ref{Troubleshooting}.
+
+
+@c ##########################################################################
+@node Troubleshooting
+@chapter Troubleshooting
+
+When loading several binary files, sometimes there's something that
+goes wrong.  This section includes a few suggestion to identify what
+step may have gone wrong.
+
+First of all, you may want to check whether the FPGA binary has been
+properly loaded and stuff is running inside it.  One  test that
+can be made is whether the LM32 soft-core is actually able to run
+programs.
+
+To this aim, you can compile and run the @code{spec-test00-cpu}
+program in the @code{test-lm32} directory of this package.
+
+@c FIXME: load a default firmware binary
+The strange name of the program is due to my plan to allow
+``@code{insmod spec name=test00}'' in order to run this test and later
+other ones.
+
+Currently, the LM32 programs can be re-loaded to a running FPGA using
+@i{spec-cl} (cpu loader), described in @ref{Tools}.  Thus, to load
+the test program, you can run this command:
+
+@example
+    spec-cl spec-test00-cpu.bin
+@end example
+
+The loader still sometimes fails (usually the first time), with a
+message like ``@code{programming error at 0 (expected 98000000, found
+0000c56a)}''. Please retry: the second time it works (this has to
+be fixed, I apologize meanwhile).
+
+The test program si simply incrementing an integer variable over
+and over. The variable lives at address 0x8000 in LM32 space, which
+is address 0x88000 in SPEC space. Thus, you can test it like this:
+
+@example
+   # spec-cl spec-test00-cpu.bin; specmem 88000; sleep 1; specmem 88000
+   00037cda
+   0025bfa2
+@end example
+
+If you @code{export VERBOSE=1} beforehand you'll get a little more
+information from both programs (please note that any value in VERBOSE
+will work, the program only checks the variable exists):
+
+@example
+   # spec-cl spec-test00-cpu.bin; specmem 88000; sleep 1; specmem 88000
+   spec-cl: Wrote 1700 bytes at offset 0x8000
+   00088000 == 0003872c
+   00088000 == 0025c8e0
+@end example
+
+As you see a running LM32 core increments its memory location slightly
+more than 2.2million times per second (0x220000).  If you can verify
+this, it means the FPGA is properly programmed and the CPU core is
+running.
+
+More troubleshooting tests will be added.
 
 
 @c ##########################################################################
