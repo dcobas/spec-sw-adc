@@ -150,7 +150,7 @@ int spec_load_lm32(struct spec_dev *dev)
 		dev->names[SPEC_NAME_PROG], fw->size, fw->size);
 
 	/* Reset the LM32 */
-	writel(1, dev->remap[0] + 0xE2000);
+	writel(0x1deadbee, dev->remap[0] + 0xA0400);
 
 	/* Copy stuff over */
 	for (off = 0; off < fw->size; off += 4) {
@@ -160,7 +160,7 @@ int spec_load_lm32(struct spec_dev *dev)
 		writel(datum, dev->remap[0] + 0x80000 + off);
 	}
 	/* Unreset the LM32 */
-	writel(0, dev->remap[0] + 0xE2000);
+	writel(0xdeadbee, dev->remap[0] + 0xA0400);
 
 	/* MSC */
 	pr_info("LM32 has been restarted\n");
@@ -197,7 +197,8 @@ static int spec_load_files(struct spec_dev *dev)
 	return 0;
 }
 
-static struct list_head spec_list;
+struct list_head spec_list;
+EXPORT_SYMBOL(spec_list);
 
 /* The probe can be called in atomic context, so all loading is delayed */
 static int spec_probe(struct pci_dev *pdev, const struct pci_device_id *id)
@@ -231,12 +232,14 @@ static int spec_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		/* go on anyways */
 	}
 
+	/* Register the device in out list, so the submodule will find it */
+	pci_set_drvdata(pdev, dev);
+	list_add(&dev->list, &spec_list);
+
 	/* The probe function can sleep, so load firmware directly */
 	spec_load_files(dev);
 
 	/* Done */
-	pci_set_drvdata(pdev, dev);
-	list_add(&dev->list, &spec_list);
 	return 0;
 }
 

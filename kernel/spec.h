@@ -12,6 +12,7 @@
 #include <linux/pci.h>
 #include <linux/workqueue.h>
 #include <linux/firmware.h>
+#include <linux/atomic.h>
 #include <linux/list.h>
 
 #define PCI_VENDOR_ID_CERN	0x10dc
@@ -39,7 +40,12 @@ struct spec_dev {
 	const struct firmware	*fw;
 	struct list_head	list;
 	unsigned long		irqcount;
+	atomic_t		has_submod;
 };
+
+/* Used by sub-modules */
+extern struct list_head spec_list;
+
 
 /* Registers from the gennum header files */
 enum {

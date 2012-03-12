@@ -2,6 +2,7 @@
 LINUX ?= /lib/modules/$(shell uname -r)/build
 
 obj-m = spec.o
+obj-m += spec-wr-nic.o
 obj-m += spec-fine-delay.o
 
 spec-objs = spec-core.o loader-ll.o
