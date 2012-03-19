@@ -1,7 +1,7 @@
 /*
  * hardware-specific definitions for the White Rabbit NIC
  *
- * Copyright (C) 2010 CERN (www.cern.ch)
+ * Copyright (C) 2010-2012 CERN (www.cern.ch)
  * Author: Alessandro Rubini <rubini@gnudd.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -16,43 +16,46 @@
 #define NSEC_PER_TICK (NSEC_PER_SEC / REFCLK_FREQ)
 
 /* The interrupt is one of those managed by our WRVIC device */
-#define WRN_IRQ_BASE		192
+#define WRN_IRQ_BASE		0 /* FIXME: relative to pci dev */
 #define WRN_IRQ_NIC		(WRN_IRQ_BASE + 0)
-#define WRN_IRQ_TSTAMP		(WRN_IRQ_BASE + 1)
+#define WRN_IRQ_TSTAMP		/* (WRN_IRQ_BASE + 1) -- not used here */
 //#define WRN_IRQ_PPSG		(WRN_IRQ_BASE + )
 //#define WRN_IRQ_RTU		(WRN_IRQ_BASE + )
 //#define WRN_IRQ_RTUT		(WRN_IRQ_BASE + )
 
 /*
- *	V3 Memory map, temporarily (Jan 2012)
+ *	spec-wr-nic memory map
  *
- *  0x00000 - 0x1ffff:    RT Subsystem
- *  0x00000 - 0x0ffff: RT Subsystem Program Memory (16 - 64 kB)
- *  0x10000 - 0x100ff: RT Subsystem UART
- *  0x10100 - 0x101ff: RT Subsystem SoftPLL-adv
- *  0x10200 - 0x102ff: RT Subsystem SPI Master
- *  0x10300 - 0x103ff: RT Subsystem GPIO
- *  0x20000 - 0x3ffff:     NIC
- *  0x20000 - 0x20fff  NIC control regs and descriptor area
- *  0x28000 - 0x2bfff  NIC packet buffer (16k)
- *  0x30000 - 0x4ffff:           Endpoints
- *  0x30000 + N * 0x400  Endpoint N control registers
- *  0x50000 - 0x50fff:  VIC
- *  0x51000 - 0x51fff:  Tstamp unit
- *  0x52000 - 0x52fff:  PPS gen
+ *  0x00000 - 0x1ffff: RT Subsystem (ram etc)
+ *  0x20000 - 0x200ff: NIC
+ *  0x20100 - 0x201ff: Endpoint (not used here)
+ *  0x20200 - 0x202ff: RT Subsystem SoftPLL-adv
+ *  0x20300 - 0x203ff: pps generator
+ *  0x20400 - 0x204ff: syscon
+ *  0x20500 - 0x205ff: RT Subsystem UART
+ *  0x20600 - 0x206ff: RT Subsystem Onewire
+ *  0x24000 - ?      : VIC core
+ *  0x28000 - ?      : timestamping unit
  */
-/* This is the base address of all the FPGA regions (EBI1, CS0) */
-#define FPGA_BASE_NIC	0x10020000
-#define FPGA_SIZE_NIC	0x00010000
-#define FPGA_BASE_EP	0x10030000
-#define FPGA_SIZE_EP	0x00010000
-#define FPGA_SIZE_EACH_EP	0x400
-#define FPGA_BASE_VIC	0x10050000 /* not used here */
+
+/* This is the base address of memory regions (gennum bridge, bar 0) */
+#define FPGA_BASE_LM32	0x00080000
+#define FPGA_SIZE_LM32	0x00010000
+
+#define FPGA_BASE_NIC	0x000a0000
+#define FPGA_SIZE_NIC	0x00000100
+
+#define FPGA_BASE_EP	0x000a0100
+#define FPGA_SIZE_EP	0x00000100
+#define FPGA_SIZE_EACH_EP	0x100 /* There is one only */
+
+#define FPGA_BASE_PPSG	0x000a0300
+#define FPGA_SIZE_PPSG	0x00000100
+
+#define FPGA_BASE_VIC	0x000a4000 /* not used here */
 #define FPGA_SIZE_VIC	0x00001000
-#define FPGA_BASE_TS	0x10051000
+#define FPGA_BASE_TS	0x000a8000
 #define FPGA_SIZE_TS	0x00001000
-#define FPGA_BASE_PPSG	0x10052000
-#define FPGA_SIZE_PPSG	0x00001000
 
 enum fpga_blocks {
 	WRN_FB_NIC,
@@ -63,14 +66,14 @@ enum fpga_blocks {
 };
 
 /* In addition to the above enumeration, we scan for those many endpoints */
-#define WRN_NR_ENDPOINTS		18
+#define WRN_NR_ENDPOINTS		1
 
 /* 8 tx and 8 rx descriptors */
 #define WRN_NR_DESC	8
 #define WRN_NR_TXDESC	WRN_NR_DESC
 #define WRN_NR_RXDESC	WRN_NR_DESC
 
-/* Magic number for endpoint */
+/* Magic number for endpoint (missing, I fear) */
 #define WRN_EP_MAGIC 0xcafebabe
 
 /*
