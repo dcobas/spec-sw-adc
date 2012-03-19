@@ -1,12 +1,14 @@
 /*
- * Trivial library function to return the first spec memory address
+ * Trivial library function to return one of the spec memory addresses
  */
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
 
-uint32_t spec_get_base(void)
+#include "spec-tools.h"
+
+uint32_t spec_get_base(int base)
 {
 	FILE *f;
 	int found = 0;
@@ -21,9 +23,10 @@ uint32_t spec_get_base(void)
 			if (strstr(s, "Device 10dc:018d"))
 				found = 1;
 		}
-		if (found) {
-			if (sscanf(s, " Memory at %x", &res) == 1)
+		if (found && sscanf(s, " Memory at %x", &res) == 1) {
+			if (!base)
 				break;
+			base--;
 		}
 	}
 	pclose(f);

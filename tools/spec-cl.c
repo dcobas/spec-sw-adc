@@ -41,7 +41,7 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	base = spec_get_base();
+	base = spec_get_base(BASE_BAR0);
 	if (base == (typeof(base))-1) {
 		fprintf(stderr, "%s: spec_get_base(): %s\n", argv[0],
 			strerror(errno));
