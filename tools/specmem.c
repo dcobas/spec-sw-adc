@@ -17,15 +17,22 @@
 
 int main(int argc, char **argv)
 {
-	int i, fd;
+	int i, fd, bar = BASE_BAR0;
 	uint32_t base, *ptr;
 	uint32_t uarg[3];
 	void *map_base;
 	char *end;
 
+	if (argc > 1 && !strcmp(argv[1], "-g")) {
+		bar = BASE_BAR4;
+		argv[1] = argv[0];
+		argc--; argv++;
+	}
+
 	if (argc < 2 || argc > 3) {
 		fprintf(stderr,
-			"Use: \"%s <offset> [<value>]\" (I/O is 32 bits)\n",
+			"Use: \"%s [-g] <offset> [<value>]\" "
+			"(-g selects gennum memory, I/O is 32 bits)\n",
 			argv[0]);
 		exit(1);
 	}
@@ -36,7 +43,7 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	base = spec_get_base();
+	base = spec_get_base(bar);
 	if (base == (typeof(base))-1) {
 		fprintf(stderr, "%s: spec_get_base(): %s\n", argv[0],
 			strerror(errno));
