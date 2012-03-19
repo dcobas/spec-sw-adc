@@ -214,6 +214,11 @@ static int spec_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		return -ENOMEM;
 	dev->pdev = pdev;
 
+	pci_enable_device(pdev);
+	if ( (i = pci_enable_msi_block(pdev, 1)) < 0)
+		pr_err("%s: enable ms block: %i\n", __func__, i);
+
+
 	/* Remap our 3 bars */
 	for (i = 0; i < 3; i++) {
 		struct resource *r = pdev->resource + (2 * i);
@@ -260,6 +265,9 @@ static void spec_remove(struct pci_dev *pdev)
 	for (i = 0; i < SPEC_NAMES; i++)
 		kfree(dev->names[i]);
 	kfree(dev);
+	pci_disable_msi(pdev);
+	pci_disable_device(pdev);
+
 }
 
 
