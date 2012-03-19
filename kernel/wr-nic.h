@@ -12,7 +12,7 @@
  */
 #ifndef __WR_NIC_H__
 #define __WR_NIC_H__
-#include <linux/irqreturn.h>
+#include <linux/interrupt.h>
 #include <linux/spinlock.h>
 #include <linux/mii.h>		/* Needed for stuct mii_if_info in wrn_dev */
 #include <linux/netdevice.h>	/* Needed for net_device_stats in wrn_dev */
