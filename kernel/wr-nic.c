@@ -17,6 +17,7 @@
 #include <linux/pci.h>
 #include <linux/io.h>
 #include <linux/atomic.h>
+#include <linux/jiffies.h>
 #include <asm/unaligned.h>
 
 #include "spec.h"
@@ -26,10 +27,18 @@
 irqreturn_t wrn_irq(int irq, void *dev_id)
 {
 	struct spec_dev *dev = dev_id;
+	static unsigned long j;
 
 	/* ack the irq */
 	readl(dev->remap[2] + 0xa20 /* FIXME: use spec.h names */);
-	printk("%s:%i\n", __func__, irq);
+	dev->irqcount++;
+
+	/* Print, but no more than 10 times per second */
+	if (j == 0 || time_after(jiffies, j + HZ / 10)) {
+		dev_info(&dev->pdev->dev, "irq %i (count %li)\n", irq,
+			 dev->irqcount);
+		j = jiffies;
+	}
 	return IRQ_HANDLED;
 }
 
@@ -37,14 +46,21 @@ irqreturn_t wrn_irq(int irq, void *dev_id)
 /* This should register a network device */
 static int wrn_probe(struct spec_dev *dev)
 {
-	int i;
+	int err;
+	uint32_t val;
 
-	for (i = dev->pdev->irq; i < dev->pdev->irq + 1; i++) {
-		if (request_irq(i, wrn_irq, IRQF_SHARED,
-				"wr-nic", dev) < 0) {
-			pr_err("%s: can't request irq %i\n", __func__, i);
-		}
+	err = request_irq(dev->pdev->irq, wrn_irq, IRQF_SHARED, "wr-nic", dev);
+	if (err < 0) {
+		dev_err(&dev->pdev->dev, "can't request irq %i (err %i)\n",
+			dev->pdev->irq, err);
+		return err;
 	}
+
+	/* MAGIC: Enable mutiple-msi and gpio interrupt in the proper reg */
+	writel(0xa55805, dev->remap[2] + 0x48);
+	val = readl(dev->remap[2] + 0x54);
+	writel(0x8000, dev->remap[2] + GN_INT_CFG0 + 4 * (val & 3));
+
 	return 0;
 }
 
