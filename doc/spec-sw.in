@@ -65,6 +65,9 @@ hosts the latest version.
 
 @menu
 * The Core Driver::             
+* The WR-NIC::                  
+* Tools::                       
+* Troubleshooting::             
 @end menu
 
 @c ##########################################################################
@@ -77,6 +80,7 @@ itself, it is a carrier for sub-modules.
 @menu
 * Compiling the Driver::        
 * Driver Operation::            
+* How sub-modules work::        
 * Future Plans::                
 @end menu
 
@@ -145,6 +149,10 @@ turn perform the following actions:
 @item Load program code for the internal CPU (if any)
 @item Load a sub-module for driving the FMC card (if any).
 @end itemize
+
+For the @i{firmware} file, two names are tried. The first one is
+specified as described later, the second one is always
+@code{spec_top.bin} and is acts as a default binary file name.
 
 If the first step fails, nothing more is tried; the second and third
 steps are expected to fail (you may not run a CPU in the FPGA or you
@@ -322,7 +330,8 @@ The tools currently available are:
         access to BAR0 of the Gennum PCI bridge; the first argument is
         the address, and the second argument is the value to be written.
         The @code{VERBOSE} environment variable makes the tool slightly
-        more verbose.
+        more verbose. If @code{-g} is passed, the tool reads and writes
+        Gennum memory (i.e., BAR4).
 
 @item spec-cl
 
@@ -352,6 +361,17 @@ When loading several binary files, sometimes there's something that
 goes wrong.  This section includes a few suggestion to identify what
 step may have gone wrong.
 
+More troubleshooting hints will be added over time.
+
+@menu
+* Ensuring the LM2 runs::       
+* Ensuring interrupts work::    
+@end menu
+
+@c ==========================================================================
+@node Ensuring the LM2 runs
+@section Ensuring the LM32 runs
+
 First of all, you may want to check whether the FPGA binary has been
 properly loaded and stuff is running inside it.  One  test that
 can be made is whether the LM32 soft-core is actually able to run
@@ -360,14 +380,23 @@ programs.
 To this aim, you can compile and run the @code{spec-test00-cpu}
 program in the @code{test-lm32} directory of this package.
 
-@c FIXME: load a default firmware binary
-The strange name of the program is due to my plan to allow
-``@code{insmod spec name=test00}'' in order to run this test and later
-other ones.
+The strange name of the program binary allows to run one of the
+following commands in order to run the test:
 
-Currently, the LM32 programs can be re-loaded to a running FPGA using
-@i{spec-cl} (cpu loader), described in @ref{Tools}.  Thus, to load
-the test program, you can run this command:
+@example
+   insmod spec.ko name=test00
+   modprobe spec name=test00
+@end example
+
+Unless you have @code{spec-test00.bin} (unlikely) the driver will load
+@code{spec_top.bin}, from @i{/lib/firmware}, and then the @code{test00}
+cpu file.
+
+As an alternative, you can re-load the new cpu binary to a running
+FPGA using @i{spec-cl} (cl == cpu loader), described in @ref{Tools}.
+Thus, to load the test program, you can run this command, where you
+can pass a complete pathname to the binary, either relative or
+absolute:
 
 @example
     spec-cl spec-test00-cpu.bin
@@ -404,8 +433,68 @@ more than 2.2million times per second (0x220000).  If you can verify
 this, it means the FPGA is properly programmed and the CPU core is
 running.
 
-More troubleshooting tests will be added.
+@c ==========================================================================
+@node Ensuring interrupts work
+@section Ensuring interrupts work
 
+This procedure can be used to verify that interrupts are correctly
+matched between the SPEC and the host computer, irrespective of
+FPGA programming.
+
+To make the test you should connect GPIO7 and GPIO6 (TP7 and TP8, on
+the solder side of the SPEC) with a wire or (better) a resistor.
+
+The @i{spec-wr-nic} driver, when loaded, registers an interrupt handler
+for an MSI interrupt and enables GPIO interrupts.  Thus, but
+enabling GPIO6 as output and GPIO7 as an interrupt source for
+rising-edge, you can see the interrupt handler reporting a message.
+
+This is the sequence you can use: the magic numbers here are described
+in the GN4124 manual:
+
+@example
+   gpiocfg () { 
+       # gpio 6 output (it's all output, but we need to OE too) and low
+       specmem -g a08 40
+       specmem -g a0c 00
+       # gpio 7 as input
+       specmem -g a04 80
+       # enable irq for gpio 7, raising edge
+       specmem -g a18 80
+       specmem -g a28 80
+   }
+   gpio6 () {
+       # gpio 6 high or low
+       v=0
+       if [ $1 == "1" ]; then v=40; fi
+       specmem -g a0c $v
+       echo -n "gpio values: "; specmem -g a10
+   }    
+
+   gpiocfg
+   gpio6 1
+   gpio6 0
+@end example
+
+The output I get when everything works is something like this:
+
+@example
+   spusa.root# gpio6 1
+   [  106.111502] spec 0000:07:00.0: irq 61 (count 1)
+   gpio values: 0000fcff
+   spusa.root# gpio6 0
+   gpio values: 0000fc3f
+   spusa.root# gpio6 1
+   [  114.614566] spec 0000:07:00.0: irq 61 (count 2)
+   gpio values: 0000fcff
+   spusa.root# gpio6 0
+   gpio values: 0000fc3f
+@end example
+
+If the interrupt is triggered too often, the code will print its
+message no more than 10 times per second, to avoid cluttering the
+serial console if something goes wrong (but not wrong enough to lock
+up the computer).
 
 @c ##########################################################################
 @bye
