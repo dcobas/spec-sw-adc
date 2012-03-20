@@ -79,7 +79,7 @@ static int spec_build_names(struct spec_dev *dev)
 		*so = '\0';
 
 	/* build the actual things */
-	for (i = 0; i < SPEC_NAMES; i++)
+	for (i = 0; i < SPEC_NR_NAMES; i++)
 		dev->names[i] = kasprintf(GFP_KERNEL, templates[i], basename);
 	return 0;
 }
@@ -90,12 +90,22 @@ static int spec_load_fpga(struct spec_dev *dev)
 	const struct firmware *fw;
 	unsigned long j;
 	int i, err, wrote, done;
+	char *names[2];
 
-	err = request_firmware(&fw, dev->names[SPEC_NAME_FW], &dev->pdev->dev);
+	names[0] = dev->names[SPEC_NAME_FW];
+	names[1] = SPEC_DEFAULT_FW_NAME;
+
+	for (i = 0; i < ARRAY_SIZE(names); i++) {
+		err = request_firmware(&fw, names[i], &dev->pdev->dev);
+		if (!err)
+			break;
+		dev_warn(&dev->pdev->dev, "Failed to load %s\n", names[i]);
+	}
 	if (err < 0)
 		return err;
-	pr_info("%s: got binary file \"%s\", %i (0x%x) bytes\n", __func__,
-		dev->names[SPEC_NAME_FW], fw->size, fw->size);
+
+	dev_info(&dev->pdev->dev, "got binary file \"%s\", %i (0x%x) bytes\n",
+		 names[i], fw->size, fw->size);
 
 	/* loader_low_level is designed to run from user space too */
 	wrote = loader_low_level(0 /* unused fd */,
@@ -181,8 +191,7 @@ static int spec_load_files(struct spec_dev *dev)
 	 * (god has said: Documentation/PCI/pci.txt)
 	 */
 	if ( (err = spec_load_fpga(dev)) < 0) {
-		dev_err(&dev->pdev->dev, "Can't load firwmare \"%s\" - %i\n",
-			dev->names[SPEC_NAME_FW], err);
+		/* Message already printed */
 		return err;
 	}
 
@@ -204,7 +213,7 @@ EXPORT_SYMBOL(spec_list);
 static int spec_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct spec_dev *dev;
-	int i;
+	int i, err;
 
 	printk("%s (device %04x:%04x)\n", __func__, pdev->bus->number,
 		pdev->devfn);
@@ -213,13 +222,20 @@ static int spec_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (!dev)
 		return -ENOMEM;
 	dev->pdev = pdev;
+	spin_lock_init(&dev->lock);
 
-	pci_enable_device(pdev);
-	if ( (i = pci_enable_msi_block(pdev, 1)) < 0)
-		pr_err("%s: enable ms block: %i\n", __func__, i);
+	err = pci_enable_device(pdev);
+	if (err) {
+		dev_err(&pdev->dev, "Can't enable device (error %i)\n", err);
+		goto out_free;
+	}
+	err = pci_enable_msi(pdev);
+	if (err) {
+		dev_err(&pdev->dev, "Can't enable msi (error %i)\n", err);
+		goto out_disable;
+	}
 
-
-	/* Remap our 3 bars */
+	/* Remap our 3 bars -- FIXME: more error checking... */
 	for (i = 0; i < 3; i++) {
 		struct resource *r = pdev->resource + (2 * i);
 		if (!r->start)
@@ -246,6 +262,13 @@ static int spec_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* Done */
 	return 0;
+
+out_disable:
+	pci_disable_device(pdev);
+out_free:
+	kfree(dev);
+	return err;
+
 }
 
 static void spec_remove(struct pci_dev *pdev)
@@ -262,7 +285,7 @@ static void spec_remove(struct pci_dev *pdev)
 	}
 	list_del(&dev->list);
 	pci_set_drvdata(pdev, NULL);
-	for (i = 0; i < SPEC_NAMES; i++)
+	for (i = 0; i < SPEC_NR_NAMES; i++)
 		kfree(dev->names[i]);
 	kfree(dev);
 	pci_disable_msi(pdev);

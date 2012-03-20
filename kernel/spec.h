@@ -11,31 +11,34 @@
 #define __SPEC_H__
 #include <linux/pci.h>
 #include <linux/workqueue.h>
+#include <linux/spinlock.h>
 #include <linux/firmware.h>
 #include <linux/atomic.h>
 #include <linux/list.h>
 
+/* We identify both newer SPECs with their own ID and older ones */
 #define PCI_VENDOR_ID_CERN	0x10dc
 #define PCI_DEVICE_ID_SPEC		0x018d
 #define PCI_VENDOR_ID_GENNUM	0x1a39
 #define PCI_DEVICE_ID_GN4124		0x0004
 
-#define SPEC_MAX_BOARDS 8
-
 enum spec_names {
 	SPEC_NAME_FW,
 	SPEC_NAME_PROG,
 	SPEC_NAME_SUBMOD,
-	SPEC_NAMES,
+	SPEC_NR_NAMES,
 };
+
+#define SPEC_DEFAULT_FW_NAME "spec_top.bin"
 
 /* Our device structure */
 struct spec_dev {
 	struct pci_dev		*pdev;
 	struct resource		*area[3];	/* bar 0, 2, 4 */
 	void			*remap[3];	/* ioremap of bar 0, 2, 4 */
-	char			*names[SPEC_NAMES];
+	char			*names[SPEC_NR_NAMES];
 	char			*submod_name;
+	spinlock_t		lock;
 	struct work_struct	work;
 	const struct firmware	*fw;
 	struct list_head	list;
@@ -45,7 +48,6 @@ struct spec_dev {
 
 /* Used by sub-modules */
 extern struct list_head spec_list;
-
 
 /* Registers from the gennum header files */
 enum {

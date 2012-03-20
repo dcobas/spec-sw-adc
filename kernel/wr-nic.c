@@ -25,8 +25,12 @@
 
 irqreturn_t wrn_irq(int irq, void *dev_id)
 {
+	struct spec_dev *dev = dev_id;
+
+	/* ack the irq */
+	readl(dev->remap[2] + 0xa20 /* FIXME: use spec.h names */);
 	printk("%s:%i\n", __func__, irq);
-	return IRQ_NONE;
+	return IRQ_HANDLED;
 }
 
 
@@ -36,7 +40,7 @@ static int wrn_probe(struct spec_dev *dev)
 	int i;
 
 	for (i = dev->pdev->irq; i < dev->pdev->irq + 1; i++) {
-		if (request_irq(i, wrn_irq, 0,
+		if (request_irq(i, wrn_irq, IRQF_SHARED,
 				"wr-nic", dev) < 0) {
 			pr_err("%s: can't request irq %i\n", __func__, i);
 		}
