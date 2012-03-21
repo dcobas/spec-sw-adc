@@ -14,6 +14,7 @@
 #include <linux/spinlock.h>
 #include <linux/firmware.h>
 #include <linux/atomic.h>
+#include <linux/delay.h>
 #include <linux/list.h>
 
 /* We identify both newer SPECs with their own ID and older ones */
@@ -56,6 +57,21 @@ static inline void CK(struct spec_dev *dev, const char *fun, int line)
 	printk("%08x - %08x\n", readl(dev->remap[0] + 0x80000),
 	       readl(dev->remap[2] + 0xa10));
 }
+
+static void spec_putc(struct spec_dev *dev, int c)
+{
+	if(c == '\n')
+		spec_putc(dev, '\r');
+	writel(c, dev->remap[0] + 0xa0508);
+	udelay(200);
+}
+
+static inline void spec_puts(struct spec_dev *dev, const char *s)
+{
+	while (*s)
+		spec_putc(dev, *(s++));
+}
+
 
 /* Used by sub-modules */
 extern struct list_head spec_list;
