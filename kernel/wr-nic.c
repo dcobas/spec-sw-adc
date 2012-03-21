@@ -105,7 +105,7 @@ static int wrn_probe(struct spec_dev *dev)
 	/* GENNUM MAGIC: Enable mutiple-msi and gpio irq in the proper reg */
 	writel(0xa55805, dev->remap[2] + 0x48);
 	val = readl(dev->remap[2] + 0x54);
-	writel(0x8000, dev->remap[2] + GN_INT_CFG0 + 4 * (val & 3));
+	//writel(0x8000, dev->remap[2] + GN_INT_CFG0 + 4 * (val & 3));
 
 	/* Make a copy of the device and register it -- FIXME: error check */
 	dev->platdev = kmemdup(&wrn_device, sizeof(wrn_device), GFP_KERNEL);
