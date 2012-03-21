@@ -40,7 +40,10 @@ static int wrn_open(struct net_device *dev)
 
 	/* Mark it as down, and start the ep-specific polling timer */
 	clear_bit(WRN_EP_UP, &ep->ep_flags);
-	wrn_ep_open(dev);
+
+#if 0 /* not on spec */
+	wrn_ep_open(dev); -- not on spec */
+#endif
 
 	/* Software-only management is in this file*/
 	if (netif_queue_stopped(dev)) {
@@ -55,8 +58,10 @@ static int wrn_open(struct net_device *dev)
 	 * which is the maximum allowed, and le software deal with
 	 * malformed packets
 	 */
-	val = readl(&ep->ep_regs->RFCR) & ~EP_RFCR_MRU_MASK;
-	writel (val | EP_RFCR_MRU_W(2048), &ep->ep_regs->RFCR);
+	if (0) { /* not for spec */
+		val = readl(&ep->ep_regs->RFCR) & ~EP_RFCR_MRU_MASK;
+		writel (val | EP_RFCR_MRU_W(2048), &ep->ep_regs->RFCR);
+	}
 
 	/* Most drivers call platform_set_drvdata() but we don't need it */
 	return 0;
@@ -67,8 +72,10 @@ static int wrn_close(struct net_device *dev)
 	struct wrn_ep *ep = netdev_priv(dev);
 	int ret;
 
+#if 0 /* not on spec */
 	if ( (ret = wrn_ep_close(dev)) )
 		return ret;
+#endif
 
 	/* FIXME: software-only fixing at close time */
 	netif_stop_queue(dev);
@@ -92,7 +99,6 @@ static int wrn_set_mac_address(struct net_device *dev, void* vaddr)
 
 	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
 
-	/* MACH gets the first two bytes, MACL the rest  */
 	val = get_unaligned_be16(dev->dev_addr);
 	writel(val, &ep->ep_regs->MACH);
 	val = get_unaligned_be32(dev->dev_addr+2);
@@ -222,6 +228,7 @@ struct net_device_stats *wrn_get_stats(struct net_device *dev)
 	return NULL;
 }
 
+#if 0 /* not in spec */
 static int wrn_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct wrn_ep *ep = netdev_priv(dev);
@@ -265,6 +272,7 @@ static int wrn_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		return res;
 	}
 }
+#endif
 
 static const struct net_device_ops wrn_netdev_ops = {
 	.ndo_open		= wrn_open,
@@ -273,7 +281,7 @@ static const struct net_device_ops wrn_netdev_ops = {
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_get_stats		= wrn_get_stats,
 	.ndo_set_mac_address	= wrn_set_mac_address,
-	.ndo_do_ioctl		= wrn_ioctl,
+	//.ndo_do_ioctl		= wrn_ioctl,
 #if 0
 	/* Missing ops, possibly to add later */
 	.ndo_set_multicast_list	= wrn_set_multicast_list,
@@ -354,12 +362,12 @@ static void __wrn_rx_descriptor(struct wrn_dev *wrn, int desc)
 
 	hwts = skb_hwtstamps(skb);
 
-	wrn_ppsg_read_time(wrn, &counter_ppsg, &utc);
+	//wrn_ppsg_read_time(wrn, &counter_ppsg, &utc);
 
-	if(counter_ppsg < REFCLK_FREQ/4 && ts_r > 3*REFCLK_FREQ/4)
+	if(0 && counter_ppsg < REFCLK_FREQ/4 && ts_r > 3*REFCLK_FREQ/4)
 		utc--;
 
-	ts.tv_sec = (s32)utc & 0x7fffffff;
+	//ts.tv_sec = (s32)utc & 0x7fffffff;
 	cntr_diff = (ts_r & 0xf) - ts_f;
 	/* the bit says the rising edge cnter is 1tick ahead */
 	if(cntr_diff == 1 || cntr_diff == (-0xf))
@@ -440,7 +448,7 @@ static void wrn_tx_interrupt(struct wrn_dev *wrn)
 			/* hardware timestamping is enabled */
 			info->tx_flags |= SKBTX_IN_PROGRESS;
 			pr_debug("%s: %i -- in progress\n", __func__, __LINE__);
-			wrn_tstamp_find_skb(wrn, i);
+			//wrn_tstamp_find_skb(wrn, i);
 			/* It has been freed if found; otherwise keep it */
 		} else {
 			dev_kfree_skb_irq(skb);
