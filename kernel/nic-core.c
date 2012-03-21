@@ -144,6 +144,16 @@ static int __wrn_alloc_tx_desc(struct wrn_dev *wrn)
 	int ret = wrn->next_tx_head;
 	struct wrn_txd __iomem *tx;
 
+	if (0) {
+		int i;
+		/* report all of them: */
+		printk("desc status:");
+		for (i = 0; i < WRN_NR_DESC; i++)
+			printk(" %i", readl(&(wrn->txd + i)->tx1)
+			       & NIC_TX1_D1_READY);
+		printk("\n");
+	}
+
 	tx = wrn->txd + ret;
 
 	/* Check if it's available */
