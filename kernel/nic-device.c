@@ -25,7 +25,7 @@
 #include "nic-mem.h"
 
 /* The remove function is used by probe, so it's not __devexit */
-static int __devexit wrn_remove(struct platform_device *pdev)
+static int wrn_remove(struct platform_device *pdev)
 {
 	struct wrn_dev *wrn = pdev->dev.platform_data;
 	int i;
@@ -48,7 +48,7 @@ static int __devexit wrn_remove(struct platform_device *pdev)
 
 	for (i = 0; i < ARRAY_SIZE(wrn->bases); i++) {
 		if (wrn->bases[i])
-			iounmap(wrn->bases[i]);
+			; /* not for spec -- iounmap(wrn->bases[i]); */
 	}
 
 	/* Unregister all interrupts that were registered */
@@ -62,29 +62,26 @@ static int __devexit wrn_remove(struct platform_device *pdev)
 }
 
 /* This helper is used by probe below */
-static int __devinit __wrn_map_resources(struct platform_device *pdev)
+static int __wrn_map_resources(struct platform_device *pdev)
 {
 	int i;
 	struct resource *res;
 	void __iomem *ptr;
 	struct wrn_dev *wrn = pdev->dev.platform_data;
+	struct spec_dev *spec = wrn->spec;
 
 	/*
 	 * The memory regions are mapped once for all endpoints.
-	 * We don't populate the whole array, but use the resource list
+	 * HACK-ALERT: pdev->num_resources is now 0....
+	 * Actually, they are not used as memory resources but bar0 offsets
 	 */
-	for (i = 0; i < pdev->num_resources; i++) {
+	for (i = 0; i < WRN_NR_OF_BLOCKS; i++) {
 		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
 		if (!res || !res->start)
 			continue;
-		ptr = ioremap(res->start, res->end + 1 - res->start);
-		if (!ptr) {
-			dev_err(&pdev->dev, "Remap for res %i (%08x) failed\n",
-				i, res->start);
-			return -ENOMEM;
-		}
+		ptr = spec->remap[0] + res->start;
 		/* Hack: find the block number and fill the array */
-		pr_debug("Remapped %08x (block %i) to %p\n",
+		pr_debug("Access %08x (block %i) at vaddr %p\n",
 			 res->start, i, ptr);
 		wrn->bases[i] = ptr;
 	}
