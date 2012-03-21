@@ -76,7 +76,7 @@ static int __wrn_map_resources(struct platform_device *pdev)
 	 * Actually, they are not used as memory resources but bar0 offsets
 	 */
 	for (i = 0; i < WRN_NR_OF_BLOCKS; i++) {
-		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
+		res = pdev->resource + i; /* HACK -- num_resources is 0 */
 		if (!res || !res->start)
 			continue;
 		ptr = spec->remap[0] + res->start;
@@ -85,6 +85,7 @@ static int __wrn_map_resources(struct platform_device *pdev)
 			 res->start, i, ptr);
 		wrn->bases[i] = ptr;
 	}
+	printk("%s:%i\n", __func__, __LINE__);
 	return 0;
 }
 
@@ -100,6 +101,7 @@ static int __devinit wrn_probe(struct platform_device *pdev)
 	static char *irq_names[] = WRN_IRQ_NAMES;
 	static irq_handler_t irq_handlers[] = WRN_IRQ_HANDLERS;
 
+#if 0
 	/* No need to lock_irq: we only protect count and continue unlocked */
 	spin_lock(&wrn->lock);
 	if (++wrn->use_count != 1) {
@@ -108,10 +110,13 @@ static int __devinit wrn_probe(struct platform_device *pdev)
 		return -EBUSY;
 	}
 	spin_unlock(&wrn->lock);
+#endif
 
+	printk("%s:%i\n", __func__, __LINE__);
 	/* Map our resource list and instantiate the shortcut pointers */
 	if ( (err = __wrn_map_resources(pdev)) )
 		goto out;
+	printk("%s:%i\n", __func__, __LINE__);
 	wrn->regs = wrn->bases[WRN_FB_NIC];
 	wrn->txtsu_regs = wrn->bases[WRN_FB_TS];
 	wrn->ppsg_regs = wrn->bases[WRN_FB_PPSG];
@@ -122,6 +127,7 @@ static int __devinit wrn_probe(struct platform_device *pdev)
 	printk("regs %p, txd %p, rxd %p, buffer %p\n",
 	       wrn->regs, wrn->txd, wrn->rxd, wrn->databuf);
 
+#if 0
 	/* Register the interrupt handlers (not shared) */
 	for (i = 0; i < ARRAY_SIZE(irq_names); i++) {
 		err = request_irq(irqs[i], irq_handlers[i],
@@ -129,6 +135,7 @@ static int __devinit wrn_probe(struct platform_device *pdev)
 		if (err) goto out;
 		wrn->irq_registered |= 1 << i;
 	}
+#endif
 	/* Reset the device, just to be sure, before making anything */
 	writel(0, &wrn->regs->CR);
 	mdelay(10);
@@ -136,12 +143,15 @@ static int __devinit wrn_probe(struct platform_device *pdev)
 	/* Finally, register one interface per endpoint */
 	memset(wrn->dev, 0, sizeof(wrn->dev));
 	for (i = 0; i < WRN_NR_ENDPOINTS; i++) {
+	printk("%s:%i\n", __func__, __LINE__);
 		netdev = alloc_etherdev(sizeof(struct wrn_ep));
 		if (!netdev) {
 			dev_err(&pdev->dev, "Etherdev alloc failed.\n");
 			err = -ENOMEM;
+	printk("%s:%i\n", __func__, __LINE__);
 			goto out;
 		}
+	printk("%s:%i\n", __func__, __LINE__);
 		/* The ep structure is filled before calling ep_probe */
 		ep = netdev_priv(netdev);
 		ep->wrn = wrn;
@@ -157,8 +167,10 @@ static int __devinit wrn_probe(struct platform_device *pdev)
 		err = wrn_endpoint_probe(netdev);
 		if (err == -ENODEV)
 			break;
+	printk("%s:%i\n", __func__, __LINE__);
 		if (err)
 			goto out;
+	printk("%s:%i\n", __func__, __LINE__);
 		/* This endpoint went in properly */
 		wrn->dev[i] = netdev;
 	}
@@ -186,6 +198,7 @@ static int __devinit wrn_probe(struct platform_device *pdev)
 	 */
 	wrn->next_tx_head = wrn->next_tx_tail = wrn->next_rx = 0;
 
+	printk("%s:%i\n", __func__, __LINE__);
 	writel(NIC_CR_RX_EN | NIC_CR_TX_EN, &wrn->regs->CR);
 	writel(WRN_IRQ_ALL, (void *)wrn->regs + 0x24 /* EIC_IER */);
 	printk("imr: %08x\n", readl((void *)wrn->regs + 0x28 /* EIC_IMR */));
