@@ -35,21 +35,28 @@ static int wrn_open(struct net_device *dev)
 	/* This is "open" just for an endpoint. The nic hw is already on */
 	//netdev_dbg(dev, "%s\n", __func__);
 
+	CK(ep->wrn->spec, __func__, __LINE__);
+
 	if (!is_valid_ether_addr(dev->dev_addr))
 		return -EADDRNOTAVAIL;
 
 	/* Mark it as down, and start the ep-specific polling timer */
 	clear_bit(WRN_EP_UP, &ep->ep_flags);
 
+	CK(ep->wrn->spec, __func__, __LINE__);
 #if 0 /* not on spec */
 	wrn_ep_open(dev); -- not on spec */
 #endif
 
 	/* Software-only management is in this file*/
 	if (netif_queue_stopped(dev)) {
+		CK(ep->wrn->spec, __func__, __LINE__);
 		netif_wake_queue(dev);
+		CK(ep->wrn->spec, __func__, __LINE__);
 	} else {
+		CK(ep->wrn->spec, __func__, __LINE__);
 		netif_start_queue(dev);
+		CK(ep->wrn->spec, __func__, __LINE__);
 	}
 
 	/*
@@ -64,6 +71,7 @@ static int wrn_open(struct net_device *dev)
 	}
 
 	/* Most drivers call platform_set_drvdata() but we don't need it */
+	CK(ep->wrn->spec, __func__, __LINE__);
 	return 0;
 }
 
@@ -78,9 +86,13 @@ static int wrn_close(struct net_device *dev)
 #endif
 
 	/* FIXME: software-only fixing at close time */
+	CK(ep->wrn->spec, __func__, __LINE__);
 	netif_stop_queue(dev);
+	CK(ep->wrn->spec, __func__, __LINE__);
 	netif_carrier_off(dev);
+	CK(ep->wrn->spec, __func__, __LINE__);
 	clear_bit(WRN_EP_UP, &ep->ep_flags);
+	CK(ep->wrn->spec, __func__, __LINE__);
 	return 0;
 }
 

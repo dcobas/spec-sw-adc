@@ -27,11 +27,15 @@ int wrn_phy_read(struct net_device *dev, int phy_id, int location)
 	struct wrn_ep *ep = netdev_priv(dev);
 	u32 val;
 
+	CK(ep->wrn->spec, __func__, __LINE__);
 	wrn_ep_write(ep, MDIO_CR, EP_MDIO_CR_ADDR_W(location));
+	CK(ep->wrn->spec, __func__, __LINE__);
 	while( (wrn_ep_read(ep, MDIO_ASR) & EP_MDIO_ASR_READY) == 0)
 		;
+	CK(ep->wrn->spec, __func__, __LINE__);
 	val = wrn_ep_read(ep, MDIO_ASR);
 	/* mask from wbgen macros */
+	CK(ep->wrn->spec, __func__, __LINE__);
 	return EP_MDIO_ASR_RDATA_R(val);
 }
 
@@ -39,12 +43,15 @@ void wrn_phy_write(struct net_device *dev, int phy_id, int location,
 		      int value)
 {
 	struct wrn_ep *ep = netdev_priv(dev);
+	CK(ep->wrn->spec, __func__, __LINE__);
 	wrn_ep_write(ep, MDIO_CR,
 		     EP_MDIO_CR_ADDR_W(location)
 		     | EP_MDIO_CR_DATA_W(value)
 		     | EP_MDIO_CR_RW);
+	CK(ep->wrn->spec, __func__, __LINE__);
 	while( (wrn_ep_read(ep, MDIO_ASR) & EP_MDIO_ASR_READY) == 0)
 		;
+	CK(ep->wrn->spec, __func__, __LINE__);
 }
 
 /* One link status poll per endpoint -- called with endpoint lock */
@@ -60,6 +67,7 @@ static void wrn_update_link_status(struct net_device *dev)
 //	printk("%s: read %x %x %x\n", __func__, bmsr, bmcr);
 
 		/* Link wnt down? */
+	CK(ep->wrn->spec, __func__, __LINE__);
 	if (!mii_link_ok(&ep->mii)) {	
 		if(netif_carrier_ok(dev)) {
 			netif_carrier_off(dev);
@@ -71,6 +79,7 @@ static void wrn_update_link_status(struct net_device *dev)
 	}
 
 	/* Currently the link is active */
+	CK(ep->wrn->spec, __func__, __LINE__);
 	if(netif_carrier_ok(dev)) {
 		/* Software already knows it's up */
 		return;
@@ -78,6 +87,7 @@ static void wrn_update_link_status(struct net_device *dev)
 
 	/* What follows is the bring-up step */
 
+	CK(ep->wrn->spec, __func__, __LINE__);
 	if (bmcr & BMCR_ANENABLE) { /* AutoNegotiation is enabled */
 		if (!(bmsr & BMSR_ANEGCOMPLETE)) {
 			/* Wait next timer, until it completes */
@@ -99,13 +109,17 @@ static void wrn_update_link_status(struct net_device *dev)
 		/* No autonegotiation. It's up immediately */
 		printk(KERN_INFO "%s: Link up.\n", dev->name);
 	}
+	CK(ep->wrn->spec, __func__, __LINE__);
 	netif_carrier_on(dev);
+	CK(ep->wrn->spec, __func__, __LINE__);
 	set_bit(WRN_EP_UP, &ep->ep_flags);
 
 	/* reset RMON counters */
+	CK(ep->wrn->spec, __func__, __LINE__);
 	ecr = wrn_ep_read(ep, ECR);
 	wrn_ep_write(ep, ECR, ecr | EP_ECR_RST_CNT);
 	wrn_ep_write(ep, ECR, ecr );
+	CK(ep->wrn->spec, __func__, __LINE__);
 }
 
 /* Actual timer function. Takes the lock and calls above function */
@@ -115,10 +129,12 @@ static void wrn_ep_check_link(unsigned long dev_id)
 	struct wrn_ep *ep = netdev_priv(dev);
 	unsigned long flags;
 
+	CK(ep->wrn->spec, __func__, __LINE__);
 	spin_lock_irqsave(&ep->lock, flags);
 	wrn_update_link_status(dev);
 	spin_unlock_irqrestore(&ep->lock, flags);
 
+	CK(ep->wrn->spec, __func__, __LINE__);
 	mod_timer(&ep->ep_link_timer, jiffies + WRN_LINK_POLL_INTERVAL);
 }
 
@@ -192,6 +208,7 @@ int wrn_endpoint_probe(struct net_device *dev)
 
 	epnum = ep->ep_number;
 
+	CK(ep->wrn->spec, __func__, __LINE__);
 	/* Check whether the ep has been sinthetized or not */
 	val = readl(&ep->ep_regs->IDCODE);
 	if (val != WRN_EP_MAGIC) {
@@ -228,7 +245,8 @@ int wrn_endpoint_probe(struct net_device *dev)
 	}
 
 	/* randomize a MAC address, so lazy users can avoid ifconfig */
-	random_ether_addr(dev->dev_addr);
+	CK(ep->wrn->spec, __func__, __LINE__);
+	random_ether_addr(dev->dev_addr); /* FIXME: read it from hw */
 
 	return 0;
 }

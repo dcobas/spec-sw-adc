@@ -25,6 +25,7 @@ static int wrn_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 	struct wrn_ep *ep = netdev_priv(dev);
 	int ret;
 
+	CK(ep->wrn->spec, __func__, __LINE__);
 	spin_lock_irq(&ep->lock);
 	ret = mii_ethtool_gset(&ep->mii, cmd);
 	spin_unlock_irq(&ep->lock);
@@ -48,9 +49,11 @@ static int wrn_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 	struct wrn_ep *ep = netdev_priv(dev);
 	int ret;
 
+	CK(ep->wrn->spec, __func__, __LINE__);
 	spin_lock_irq(&ep->lock);
 	ret = mii_ethtool_sset(&ep->mii, cmd);
 	spin_unlock_irq(&ep->lock);
+	CK(ep->wrn->spec, __func__, __LINE__);
 
 	return ret;
 }
@@ -60,9 +63,11 @@ static int wrn_nwayreset(struct net_device *dev)
 	struct wrn_ep *ep = netdev_priv(dev);
 	int ret;
 
+	CK(ep->wrn->spec, __func__, __LINE__);
 	spin_lock_irq(&ep->lock);
 	ret = mii_nway_restart(&ep->mii);
 	spin_unlock_irq(&ep->lock);
+	CK(ep->wrn->spec, __func__, __LINE__);
 
 	return ret;
 }
@@ -70,10 +75,13 @@ static int wrn_nwayreset(struct net_device *dev)
 static void wrn_get_drvinfo(struct net_device *dev,
 			      struct ethtool_drvinfo *info)
 {
+	struct wrn_ep *ep = netdev_priv(dev);
+	CK(ep->wrn->spec, __func__, __LINE__);
 	strlcpy(info->driver, DRV_NAME, sizeof(info->driver));
 	strlcpy(info->version, DRV_VERSION, sizeof(info->version));
 	strlcpy(info->bus_info, dev_name(dev->dev.parent),
 		sizeof(info->bus_info));
+	CK(ep->wrn->spec, __func__, __LINE__);
 }
 
 /*
@@ -94,6 +102,9 @@ static const struct ethtool_ops wrn_ethtool_ops = {
 
 int wrn_ethtool_init(struct net_device *netdev)
 {
+	struct wrn_ep *ep = netdev_priv(netdev);
+	CK(ep->wrn->spec, __func__, __LINE__);
 	netdev->ethtool_ops = &wrn_ethtool_ops;
+	CK(ep->wrn->spec, __func__, __LINE__);
 	return 0;
 }
