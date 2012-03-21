@@ -27,23 +27,25 @@
  *	spec-wr-nic memory map
  *
  *  0x00000 - 0x1ffff: RT Subsystem (ram etc)
- *  0x20000 - 0x200ff: NIC
- *  0x20100 - 0x201ff: Endpoint (not used here)
+ *
+ *  0x20100 - 0x201ff: Endpoint (almost not used here)
  *  0x20200 - 0x202ff: RT Subsystem SoftPLL-adv
  *  0x20300 - 0x203ff: pps generator
- *  0x20400 - 0x204ff: syscon
- *  0x20500 - 0x205ff: RT Subsystem UART
- *  0x20600 - 0x206ff: RT Subsystem Onewire
- *  0x24000 - ?      : VIC core
- *  0x28000 - ?      : timestamping unit
+ *  0x20400 - 0x204ff: Syscon
+ *  0x20500 - 0x205ff: uart
+ *
+ *  0x40000 - 0x400ff: NIC
+ *  0x60000 - 0x60fff: VIC core
+ *  0x61000 - 0x61fff: timestamping unit
+ *
  */
 
 /* This is the base address of memory regions (gennum bridge, bar 0) */
 #define FPGA_BASE_LM32	0x00080000
 #define FPGA_SIZE_LM32	0x00010000
 
-#define FPGA_BASE_NIC	0x000a0000
-#define FPGA_SIZE_NIC	0x00000100
+#define FPGA_BASE_NIC	0x000c0000
+#define FPGA_SIZE_NIC	0x00010000
 
 #define FPGA_BASE_EP	0x000a0100
 #define FPGA_SIZE_EP	0x00000100
@@ -52,9 +54,9 @@
 #define FPGA_BASE_PPSG	0x000a0300
 #define FPGA_SIZE_PPSG	0x00000100
 
-#define FPGA_BASE_VIC	0x000a4000 /* not used here */
+#define FPGA_BASE_VIC	0x000e0000 /* not used here */
 #define FPGA_SIZE_VIC	0x00001000
-#define FPGA_BASE_TS	0x000a8000
+#define FPGA_BASE_TS	0x000e1000
 #define FPGA_SIZE_TS	0x00001000
 
 enum fpga_blocks {
