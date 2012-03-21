@@ -113,6 +113,7 @@ struct wrn_ep {
 	struct EP_WB __iomem	*ep_regs; /* each EP has its own memory */
 	spinlock_t		lock;
 	struct timer_list	ep_link_timer;
+	struct timer_list	irq_poll_timer; /* FIXME: hack */
 	volatile unsigned long	ep_flags;
 	struct mii_if_info	mii; /* for ethtool operations */
 	int			ep_number;

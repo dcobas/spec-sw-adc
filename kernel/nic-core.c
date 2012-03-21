@@ -23,6 +23,8 @@
 #include "wr-nic.h"
 #include "nic-mem.h"
 
+static void wrn_irq_timer(unsigned long data);
+
 /*
  * The following functions are the standard network device operations.
  * They act on the _endpoint_ (as each Linux interface is one endpoint)
@@ -77,6 +79,9 @@ static int wrn_open(struct net_device *dev)
 
 	spec_puts(ep->wrn->spec, "opening\n");
 
+	setup_timer(&ep->irq_poll_timer, wrn_irq_timer, (unsigned long)ep);
+	mod_timer(&ep->irq_poll_timer, jiffies + 1);
+
 	/* Most drivers call platform_set_drvdata() but we don't need it */
 	CK(ep->wrn->spec, __func__, __LINE__);
 	return 0;
@@ -86,6 +91,8 @@ static int wrn_close(struct net_device *dev)
 {
 	struct wrn_ep *ep = netdev_priv(dev);
 	int ret;
+
+	del_timer_sync(&ep->irq_poll_timer);
 
 #if 0 /* not on spec */
 	if ( (ret = wrn_ep_close(dev)) )
@@ -509,4 +516,15 @@ irqreturn_t wrn_interrupt(int irq, void *dev_id)
 		tasklet_schedule(&wrn->rx_tlet);
 	}
 	return IRQ_HANDLED;
+}
+
+
+/* Temporary: user a timer to poll the interrupt */
+static void wrn_irq_timer(unsigned long data)
+{
+	struct wrn_ep *ep = (void *)data;
+
+	wrn_interrupt(123, ep->wrn);
+	mod_timer(&ep->irq_poll_timer, jiffies + HZ/10);
+	return 0;
 }
