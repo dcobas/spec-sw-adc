@@ -114,6 +114,10 @@ static int wrn_probe(struct spec_dev *dev)
 	wrndev->spec = dev;
 	dev->platdev->dev.platform_data = wrndev;
 	platform_device_register(dev->platdev);
+
+	/* increment ID for next time */
+	wrn_device.id++;
+
 	return 0;
 }
 
