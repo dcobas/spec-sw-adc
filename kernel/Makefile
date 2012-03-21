@@ -7,7 +7,8 @@ obj-m += spec-fine-delay.o
 
 spec-objs = spec-core.o loader-ll.o
 
-spec-wr-nic-objs = wr-nic.o nic-core.o nic-device.o
+spec-wr-nic-objs = wr-nic.o nic-core.o nic-device.o nic-endpoint.o \
+	nic-ethtool.o
 
 all modules:
 	$(MAKE) -C $(LINUX) M=$(shell /bin/pwd) modules
