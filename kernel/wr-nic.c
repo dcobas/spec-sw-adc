@@ -56,7 +56,7 @@ static int wrn_probe(struct spec_dev *dev)
 		return err;
 	}
 
-	/* MAGIC: Enable mutiple-msi and gpio interrupt in the proper reg */
+	/* GENNUM MAGIC: Enable mutiple-msi and gpio irq in the proper reg */
 	writel(0xa55805, dev->remap[2] + 0x48);
 	val = readl(dev->remap[2] + 0x54);
 	writel(0x8000, dev->remap[2] + GN_INT_CFG0 + 4 * (val & 3));
@@ -66,16 +66,14 @@ static int wrn_probe(struct spec_dev *dev)
 
 static void wrn_remove(struct spec_dev *dev)
 {
-	int i;
-
-	for (i = dev->pdev->irq; i < dev->pdev->irq + 1; i++) {
-		free_irq(i, dev);
-	}
+	free_irq(dev->pdev->irq, dev);
 }
 
 static int wrn_init(void)
 {
 	struct spec_dev *dev;
+
+	platform_driver_register(&wrn_driver); /* nic-device.c */
 
 	/* Scan the list and see what is there. Take hold of everything */
 	list_for_each_entry(dev, &spec_list, list) {
@@ -97,6 +95,8 @@ static void wrn_exit(void)
 		       dev->area[0], dev->remap[0]);
 		wrn_remove(dev);
 	}
+
+	platform_driver_unregister(&wrn_driver); /* nic-device.c */
 
 }
 
