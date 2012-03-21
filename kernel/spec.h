@@ -47,6 +47,16 @@ struct spec_dev {
 	struct platform_device	*platdev;
 };
 
+/* Use:
+	CK(dev, __func__, __LINE__);
+*/
+static inline void CK(struct spec_dev *dev, const char *fun, int line)
+{
+	printk("check: %s:%i -- ", fun, line);
+	printk("%08x - %08x\n", readl(dev->remap[0] + 0x80000),
+	       readl(dev->remap[2] + 0xa10));
+}
+
 /* Used by sub-modules */
 extern struct list_head spec_list;
 
