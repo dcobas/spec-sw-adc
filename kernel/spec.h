@@ -44,6 +44,7 @@ struct spec_dev {
 	struct list_head	list;
 	unsigned long		irqcount;
 	atomic_t		has_submod;
+	struct platform_device	*platdev;
 };
 
 /* Used by sub-modules */

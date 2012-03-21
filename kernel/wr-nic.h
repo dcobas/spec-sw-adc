@@ -18,6 +18,7 @@
 #include <linux/netdevice.h>	/* Needed for net_device_stats in wrn_dev */
 #include <linux/timer.h>	/* Needed for struct time_list in wrn_dev*/
 
+#include "spec.h"
 #include "nic-hardware.h" /* Magic numbers: please fix them as needed */
 
 #define DRV_NAME "wr-nic" /* Used in messages and device/driver names */
@@ -67,6 +68,8 @@ struct wrn_desc_pending {
 struct wrn_dev {
 	/* Base addresses. It's easier with an array, but not all are used */
 	void __iomem		*bases[WRN_NR_OF_BLOCKS];
+
+	struct spec_dev		*spec;
 
 	struct NIC_WB __iomem	*regs; /* shorthand for NIC-block registers */
 	struct TXTSU_WB __iomem *txtsu_regs; /* ... and the same for TXTSU */
