@@ -51,6 +51,7 @@ static int wrn_remove(struct platform_device *pdev)
 			; /* not for spec -- iounmap(wrn->bases[i]); */
 	}
 
+#if 0
 	/* Unregister all interrupts that were registered */
 	for (i = 0; wrn->irq_registered; i++) {
 		static int irqs[] = WRN_IRQ_NUMBERS;
@@ -58,6 +59,7 @@ static int wrn_remove(struct platform_device *pdev)
 			free_irq(irqs[i], wrn);
 		wrn->irq_registered &= ~(1 << i);
 	}
+#endif
 	return 0;
 }
 
