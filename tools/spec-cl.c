@@ -11,6 +11,7 @@
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <time.h>
 #include <arpa/inet.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -21,6 +22,7 @@
 int main(int argc, char **argv)
 {
 	int i, fd;
+	unsigned long t;
 	FILE *f;
 	uint32_t base;
 	struct stat stbuf;
@@ -93,16 +95,25 @@ int main(int argc, char **argv)
 	}
 	ibuf = (void *)buf;
 
-	/* Phew... we are there, finally */
-	*(volatile uint32_t *)(map_base + 0xA0400) = 0x1deadbee;
+	/* Phew... we are there, finally: write the reset a few times */
+	for (i = 0; i < 30; i++) {
+		*(volatile uint32_t *)(map_base + 0xA0400) = 0x1deadbee;
+		usleep(1);
+	}
+	t = time(NULL);
 	while ( !((*(volatile uint32_t *)(map_base + 0xA0400)) & (1<<28)) )
-		  ;
+		if (time(NULL) - t > 1)
+			break;
+	if (time(NULL) - t > 1) {
+		fprintf(stderr, "%s: can't reset the soft-core\n", argv[0]);
+		exit(1);
+	}
 
 	p = map_base + 0x80000;
- 	for (i = 0; i < (stbuf.st_size + 3) / 4; i++) {
+	for (i = 0; i < (stbuf.st_size + 3) / 4; i++) {
 		p[i] = htonl(ibuf[i]); /* big endian */
-		sync();
 	}
+	sync(); /* memory barrier */
 
 	for (i = 0; i < (stbuf.st_size + 3) / 4; i++) {
 		if (p[i] != htonl(ibuf[i]))
