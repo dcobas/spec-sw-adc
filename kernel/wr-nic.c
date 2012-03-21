@@ -95,6 +95,7 @@ static int wrn_probe(struct spec_dev *dev)
 	uint32_t val;
 	struct wrn_dev *wrndev;
 
+	spec_puts(dev, "wr-nic-probe\n");
 	err = request_irq(dev->pdev->irq, wrn_irq, IRQF_SHARED, "wr-nic", dev);
 	if (err < 0) {
 		dev_err(&dev->pdev->dev, "can't request irq %i (err %i)\n",

@@ -11,6 +11,7 @@
  * published by the Free Software Foundation.
  */
 
+#define DEBUG
 #include <linux/kernel.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -69,6 +70,12 @@ static int wrn_open(struct net_device *dev)
 		val = readl(&ep->ep_regs->RFCR) & ~EP_RFCR_MRU_MASK;
 		writel (val | EP_RFCR_MRU_W(2048), &ep->ep_regs->RFCR);
 	}
+
+	writel(NIC_CR_RX_EN | NIC_CR_TX_EN, &ep->wrn->regs->CR);
+	writel(WRN_IRQ_ALL, (void *)ep->wrn->regs + 0x24 /* EIC_IER */);
+	printk("imr: %08x\n", readl((void *)ep->wrn->regs + 0x28 /* EIC_IMR */));
+
+	spec_puts(ep->wrn->spec, "opening\n");
 
 	/* Most drivers call platform_set_drvdata() but we don't need it */
 	CK(ep->wrn->spec, __func__, __LINE__);
@@ -195,6 +202,8 @@ static int wrn_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	desc = __wrn_alloc_tx_desc(wrn);
 	id = (wrn->id++) & 0xffff;
 	spin_unlock_irqrestore(&wrn->lock, flags);
+
+	printk("%s: desc %i\n", __func__, desc);
 
 	if (desc < 0) /* error */
 		return desc;
