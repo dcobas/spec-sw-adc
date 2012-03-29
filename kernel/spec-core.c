@@ -206,6 +206,7 @@ static int spec_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	struct spec_dev *dev;
 	int i;
 
+	pr_error(KBUILD_MODNAME "spec device probed\n");
 	printk("%s (device %04x:%04x)\n", __func__, pdev->bus->number,
 		pdev->devfn);
 	printk("%s: current %i (%s)\n", __func__, current->pid, current->comm);
