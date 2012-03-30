@@ -18,3 +18,11 @@ install modules_install:
 clean:
 	rm -rf *.o *~  .*.cmd *.ko *.mod.c .tmp_versions Module.symvers \
 		Module.markers modules.order
+
+load:
+	insmod ./spec.ko name=%b%s
+	insmod ./fmcadc.ko
+
+unload:
+	rmmod fmcadc
+	rmmod spec
