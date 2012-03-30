@@ -40,11 +40,13 @@ irqreturn_t fadc_irq(int irq, void *dev_id)
 
 static int __devinit fadc_probe(struct platform_device *pdev)
 {
+	printk("wheeee! probe!\n");
 	return 0;
 }
 
 static int fadc_remove(struct platform_device *pdev)
 {
+	printk("awwwww! remove!!\n");
 	return 0;
 }
 
