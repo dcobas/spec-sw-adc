@@ -120,12 +120,14 @@ static int __devinit fadc_probe(struct platform_device *pdev)
 	cdev_init(&fadcdev->cdev, &fadc_fops);
 	fadcdev->cdev.owner = THIS_MODULE;
 	fadcdev->cdev.ops = &fadc_fops;
+	printk("cdev_add\n");
 	ret = cdev_add(&fadcdev->cdev, devno, 1);
 	if (ret) {
 		printk(KERN_ERR "error %d adding cdev %d\n", ret, ndev);
 		goto cdev_add_fail; 
 	}
 
+	printk("device_create\n");
 	fadcdev->dev = device_create(fadc_class, &pdev->dev, devno, fadcdev, "spec_adc%i", ndev);
 	if (IS_ERR(fadcdev->dev)) {
 		ret = PTR_ERR(fadcdev->dev);
@@ -147,7 +149,9 @@ static int fadc_remove(struct platform_device *pdev)
 
 	fadcdev = pdev->dev.platform_data;
 
+	printk("device_destroy\n");
 	device_destroy(fadc_class, fadcdev->ndev);
+	printk("cdev_del\n");
 	cdev_del(&fadcdev->cdev);
 
 	return 0;
