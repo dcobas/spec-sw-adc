@@ -12,11 +12,22 @@
 #include <linux/jiffies.h>
 #include <linux/platform_device.h>
 #include <asm/unaligned.h>
+#include <linux/cdev.h>
+#include <linux/fs.h>
 
 #include "spec.h"
 
+#define FMC_ADC_MAX_DEVICES 32
+
+struct class *fadc_class;
+static dev_t fadc_devno;
+
 struct fadc_dev {
+	int ndev;
 	struct spec_dev *spec;
+	struct cdev cdev;
+	struct device *dev;
+	struct module *owner;
 };
 
 /* Interrupt handler, currently doint nothing */
@@ -38,15 +49,107 @@ irqreturn_t fadc_irq(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+/* Device operations */
+
+static int fadc_device_open(struct inode *inode, struct file *file)
+{
+	struct fadc_dev *fadcdev;
+
+	fadcdev = container_of(inode->i_cdev, struct fadc_dev, cdev);
+	if (!try_module_get(fadcdev->owner))
+		return -ENODEV;
+	file->private_data = fadcdev;
+
+	return 0;
+}
+
+static int fadc_device_release(struct inode *inode, struct file *file)
+{
+	struct fadc_dev *fadcdev;
+
+	/* DOUBT: can file->private_data ever end up as NULL? */
+	fadcdev = file->private_data;
+	module_put(fadcdev->owner);
+
+	return 0;
+}
+
+static ssize_t fadc_device_read(struct file *f, char *buf, size_t count,
+		loff_t *ppos)
+{
+	struct fadc_dev *fadcdev;
+
+	fadcdev = f->private_data;
+
+	return 0;
+}
+
+static ssize_t fadc_device_write(struct file *f, const char *buf, size_t count,
+		loff_t *ppos)
+{
+	struct fadc_dev *fadcdev;
+
+	if (count == 0)
+		return 0;
+
+	fadcdev = f->private_data;
+
+	return 0;
+}
+
+struct file_operations fadc_fops = {
+	.owner = THIS_MODULE,
+	.open = fadc_device_open,
+	.release = fadc_device_release,
+	.read = fadc_device_read,
+	.write = fadc_device_write,
+};
+
+
 static int __devinit fadc_probe(struct platform_device *pdev)
 {
-	printk("wheeee! probe!\n");
+	int ret;
+	dev_t devno;
+	static int ndev;
+	struct fadc_dev *dev;
+
+	dev = pdev->dev.platform_data;
+
+	ndev = dev->ndev;
+	devno = MKDEV(MAJOR(fadc_devno), ndev);
+	cdev_init(&dev->cdev, &fadc_fops);
+	dev->cdev.owner = THIS_MODULE;
+	dev->cdev.ops = &fadc_fops;
+	ret = cdev_add(&dev->cdev, devno, 1);
+	if (ret) {
+		printk(KERN_ERR "error %d adding cdev %d\n", ret, ndev);
+		goto cdev_add_fail; 
+	}
+
+	dev->dev = device_create(fadc_class, &pdev->dev, devno, dev, "spec_adc%i", ndev);
+	if (IS_ERR(dev->dev)) {
+		ret = PTR_ERR(dev->dev);
+		printk(KERN_ERR "error %d creating device %d\n", ret, ndev);
+		goto device_create_fail;
+	}
+
 	return 0;
+
+device_create_fail:
+	cdev_del(&dev->cdev);
+cdev_add_fail:
+	return ret;
 }
 
 static int fadc_remove(struct platform_device *pdev)
 {
-	printk("awwwww! remove!!\n");
+	struct fadc_dev *dev;
+
+	dev = pdev->dev.platform_data;
+
+	device_destroy(fadc_class, dev->ndev);
+	cdev_del(&dev->cdev);
+
 	return 0;
 }
 
@@ -100,6 +203,8 @@ static int fadc_init_probe(struct spec_dev *dev)
 	dev->platdev = kmemdup(&fadc_plat_device, sizeof(fadc_plat_device), GFP_KERNEL);
 	fadcdev = kzalloc(sizeof(struct fadc_dev), GFP_KERNEL);
 	fadcdev->spec = dev;
+	fadcdev->owner = THIS_MODULE;
+	fadcdev->ndev = fadc_plat_device.id;
 	dev->platdev->dev.platform_data = fadcdev;
 	platform_device_register(dev->platdev);
 
@@ -122,7 +227,23 @@ static void fadc_init_remove(struct spec_dev *dev)
 
 static int __init fadc_init(void)
 {
+        int ret;
 	struct spec_dev *dev;
+
+	/* allocate the character major/minor region */
+	ret = alloc_chrdev_region(&fadc_devno, 0, FMC_ADC_MAX_DEVICES, "fmcadc");
+	if (ret) {
+		printk(KERN_ERR "alloc_chrdev_region failed\n");
+		goto alloc_chr_fail;
+	}
+
+	/* create a sysfs class */
+	fadc_class = class_create(THIS_MODULE, "fmcadc");
+	if (IS_ERR(fadc_class)) {
+		printk(KERN_ERR "class_create failed\n");
+		ret = PTR_ERR(fadc_class);
+		goto class_create_fail;
+	}
 
 	platform_driver_register(&fadc_driver);
 
@@ -134,6 +255,11 @@ static int __init fadc_init(void)
 		fadc_init_probe(dev);
 	}
 	return 0;
+
+class_create_fail:
+	unregister_chrdev_region(fadc_devno, FMC_ADC_MAX_DEVICES);
+alloc_chr_fail:
+	return ret;
 }
 
 static void __exit fadc_exit(void)
@@ -148,6 +274,8 @@ static void __exit fadc_exit(void)
 	}
 
 	platform_driver_unregister(&fadc_driver);
+	class_destroy(fadc_class);
+	unregister_chrdev_region(fadc_devno, FMC_ADC_MAX_DEVICES);
 }
 
 module_init(fadc_init);
