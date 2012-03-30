@@ -111,24 +111,24 @@ static int __devinit fadc_probe(struct platform_device *pdev)
 	int ret;
 	dev_t devno;
 	static int ndev;
-	struct fadc_dev *dev;
+	struct fadc_dev *fadcdev;
 
-	dev = pdev->dev.platform_data;
+	fadcdev = pdev->dev.platform_data;
 
-	ndev = dev->ndev;
+	ndev = fadcdev->ndev;
 	devno = MKDEV(MAJOR(fadc_devno), ndev);
-	cdev_init(&dev->cdev, &fadc_fops);
-	dev->cdev.owner = THIS_MODULE;
-	dev->cdev.ops = &fadc_fops;
-	ret = cdev_add(&dev->cdev, devno, 1);
+	cdev_init(&fadcdev->cdev, &fadc_fops);
+	fadcdev->cdev.owner = THIS_MODULE;
+	fadcdev->cdev.ops = &fadc_fops;
+	ret = cdev_add(&fadcdev->cdev, devno, 1);
 	if (ret) {
 		printk(KERN_ERR "error %d adding cdev %d\n", ret, ndev);
 		goto cdev_add_fail; 
 	}
 
-	dev->dev = device_create(fadc_class, &pdev->dev, devno, dev, "spec_adc%i", ndev);
-	if (IS_ERR(dev->dev)) {
-		ret = PTR_ERR(dev->dev);
+	fadcdev->dev = device_create(fadc_class, &pdev->dev, devno, fadcdev, "spec_adc%i", ndev);
+	if (IS_ERR(fadcdev->dev)) {
+		ret = PTR_ERR(fadcdev->dev);
 		printk(KERN_ERR "error %d creating device %d\n", ret, ndev);
 		goto device_create_fail;
 	}
@@ -136,19 +136,19 @@ static int __devinit fadc_probe(struct platform_device *pdev)
 	return 0;
 
 device_create_fail:
-	cdev_del(&dev->cdev);
+	cdev_del(&fadcdev->cdev);
 cdev_add_fail:
 	return ret;
 }
 
 static int fadc_remove(struct platform_device *pdev)
 {
-	struct fadc_dev *dev;
+	struct fadc_dev *fadcdev;
 
-	dev = pdev->dev.platform_data;
+	fadcdev = pdev->dev.platform_data;
 
-	device_destroy(fadc_class, dev->ndev);
-	cdev_del(&dev->cdev);
+	device_destroy(fadc_class, fadcdev->ndev);
+	cdev_del(&fadcdev->cdev);
 
 	return 0;
 }
