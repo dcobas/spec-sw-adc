@@ -120,14 +120,12 @@ static int __devinit fadc_probe(struct platform_device *pdev)
 	cdev_init(&fadcdev->cdev, &fadc_fops);
 	fadcdev->cdev.owner = THIS_MODULE;
 	fadcdev->cdev.ops = &fadc_fops;
-	printk("cdev_add\n");
 	ret = cdev_add(&fadcdev->cdev, devno, 1);
 	if (ret) {
 		printk(KERN_ERR "error %d adding cdev %d\n", ret, ndev);
 		goto cdev_add_fail; 
 	}
 
-	printk("device_create\n");
 	fadcdev->dev = device_create(fadc_class, &pdev->dev, devno, fadcdev, "spec_adc%i", ndev);
 	if (IS_ERR(fadcdev->dev)) {
 		ret = PTR_ERR(fadcdev->dev);
@@ -149,9 +147,7 @@ static int fadc_remove(struct platform_device *pdev)
 
 	fadcdev = pdev->dev.platform_data;
 
-	printk("device_destroy\n");
-	device_destroy(fadc_class, fadcdev->ndev);
-	printk("cdev_del\n");
+	device_destroy(fadc_class, MKDEV(MAJOR(fadc_devno), fadcdev->ndev));
 	cdev_del(&fadcdev->cdev);
 
 	return 0;
@@ -190,7 +186,6 @@ static int fadc_init_probe(struct spec_dev *dev)
 	uint32_t val;
 	struct fadc_dev *fadcdev;
 
-	printk("spec_adc_probe\n");
 	err = request_irq(dev->pdev->irq, fadc_irq, IRQF_SHARED, "wr-nic", dev);
 	if (err < 0) {
 		dev_err(&dev->pdev->dev, "can't request irq %i (err %i)\n",
@@ -235,14 +230,14 @@ static int __init fadc_init(void)
 	struct spec_dev *dev;
 
 	/* allocate the character major/minor region */
-	ret = alloc_chrdev_region(&fadc_devno, 0, FMC_ADC_MAX_DEVICES, "fmcadc");
+	ret = alloc_chrdev_region(&fadc_devno, 0, FMC_ADC_MAX_DEVICES, "spec_adc");
 	if (ret) {
 		printk(KERN_ERR "alloc_chrdev_region failed\n");
 		goto alloc_chr_fail;
 	}
 
 	/* create a sysfs class */
-	fadc_class = class_create(THIS_MODULE, "fmcadc");
+	fadc_class = class_create(THIS_MODULE, "spec_adc");
 	if (IS_ERR(fadc_class)) {
 		printk(KERN_ERR "class_create failed\n");
 		ret = PTR_ERR(fadc_class);
@@ -277,9 +272,9 @@ static void __exit fadc_exit(void)
 		fadc_init_remove(dev);
 	}
 
-	platform_driver_unregister(&fadc_driver);
 	class_destroy(fadc_class);
 	unregister_chrdev_region(fadc_devno, FMC_ADC_MAX_DEVICES);
+	platform_driver_unregister(&fadc_driver);
 }
 
 module_init(fadc_init);
