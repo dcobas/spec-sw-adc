@@ -40,9 +40,11 @@ void fadc_set_frontled(struct fadc_dev *dev)
 	int reg;
 
 	reg = readl(dev->spec->remap[2] + FMC_CSR_BASE + CSR_CTL);
+	printk("read CSR_CTL=0x%08x\n", reg);
 	/* reg &= ~(1<<self.CTL_TRIG_LED)*/
 	reg |= CTL_TRIG_LED;
 	reg &= CTL_MASK;
+	printk("write CSR_CTL=0x%08x\n", reg);
 	writel(reg, dev->spec->remap[2] + FMC_CSR_BASE + CSR_CTL);
 }
 
