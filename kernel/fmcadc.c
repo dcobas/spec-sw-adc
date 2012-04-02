@@ -35,14 +35,16 @@ struct fadc_dev {
 #define CTL_TRIG_LED	(1 << 6)
 #define CTL_MASK	0xEC
 
-void fadc_set_frontled(struct fadc_dev *dev)
+void fadc_set_frontled(struct fadc_dev *dev, int state)
 {
 	int reg;
 
 	reg = readl(dev->spec->remap[2] + FMC_CSR_BASE + CSR_CTL);
 	printk("read CSR_CTL=0x%08x\n", reg);
-	/* reg &= ~(1<<self.CTL_TRIG_LED)*/
-	reg |= CTL_TRIG_LED;
+	if (state)
+		reg |= CTL_TRIG_LED;
+	else
+		reg &= ~CTL_TRIG_LED;
 	reg &= CTL_MASK;
 	printk("write CSR_CTL=0x%08x\n", reg);
 	writel(reg, dev->spec->remap[2] + FMC_CSR_BASE + CSR_CTL);
@@ -151,7 +153,7 @@ static int __devinit fadc_probe(struct platform_device *pdev)
 		goto device_create_fail;
 	}
 
-	fadc_set_frontled(fadcdev);
+	fadc_set_frontled(fadcdev, 0);
 
 	return 0;
 
