@@ -31,32 +31,35 @@ struct fadc_dev {
 	struct module *owner;
 };
 
-#define	FMC_CSR_BASE	0x90000
-#define CSR_CTL		0x0
 #define CTL_TRIG_LED	(1 << 6)
-#define CTL_MASK	0xEC
+#define CTL_ACQ_LED	(1 << 7)
 
-void fadc_init_mezzanine_clock(struct fadc_dev *dev)
-{
-	writel(((1 << FADC_CTL_CLK_EN)|(1 << FADC_CTL_OFFSET_DAC_CLR_N)),
-		dev->spec->remap[2] + FMC_CSR_BASE + FADC_R_CTL);
-}
-
-void fadc_set_frontled(struct fadc_dev *dev, int state)
+void fadc_trig_led(struct fadc_dev *dev, int state)
 {
 	int reg;
 
-	reg = readl(dev->spec->remap[2] + FMC_CSR_BASE + CSR_CTL);
-	printk("read CSR_CTL=0x%08x\n", reg);
+	reg = readl(dev->spec->remap[0] + FADC_FMC_CSR_ADDR + FADC_R_CTL);
 	if (state)
 		reg |= CTL_TRIG_LED;
 	else
 		reg &= ~CTL_TRIG_LED;
-	reg &= CTL_MASK;
-	printk("write CSR_CTL=0x%08x\n", reg);
-	writel(reg, dev->spec->remap[2] + FMC_CSR_BASE + CSR_CTL);
-	reg = readl(dev->spec->remap[2] + FMC_CSR_BASE + CSR_CTL);
-	printk("read CSR_CTL=0x%08x\n", reg);
+	reg &= FADC_CTL_MASK;
+	writel(reg, dev->spec->remap[0] + FADC_FMC_CSR_ADDR + FADC_R_CTL);
+	reg = readl(dev->spec->remap[0] + FADC_FMC_CSR_ADDR + FADC_R_CTL);
+}
+
+void fadc_acq_led(struct fadc_dev *dev, int state)
+{
+	int reg;
+
+	reg = readl(dev->spec->remap[0] + FADC_FMC_CSR_ADDR + FADC_R_CTL);
+	if (state)
+		reg |= CTL_ACQ_LED;
+	else
+		reg &= ~CTL_ACQ_LED;
+	reg &= FADC_CTL_MASK;
+	writel(reg, dev->spec->remap[0] + FADC_FMC_CSR_ADDR + FADC_R_CTL);
+	reg = readl(dev->spec->remap[0] + FADC_FMC_CSR_ADDR + FADC_R_CTL);
 }
 
 /* Interrupt handler, currently doint nothing */
@@ -162,8 +165,8 @@ static int __devinit fadc_probe(struct platform_device *pdev)
 		goto device_create_fail;
 	}
 
-	fadc_init_mezzanine_clock(fadcdev);
-	fadc_set_frontled(fadcdev, 1);
+	fadc_trig_led(fadcdev, 1);
+	fadc_acq_led(fadcdev, 1);
 
 	return 0;
 
@@ -178,6 +181,9 @@ static int fadc_remove(struct platform_device *pdev)
 	struct fadc_dev *fadcdev;
 
 	fadcdev = pdev->dev.platform_data;
+
+	fadc_trig_led(fadcdev, 0);
+	fadc_acq_led(fadcdev, 0);
 
 	device_destroy(fadc_class, MKDEV(MAJOR(fadc_devno), fadcdev->ndev));
 	cdev_del(&fadcdev->cdev);
