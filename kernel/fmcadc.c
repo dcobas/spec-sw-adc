@@ -31,18 +31,15 @@ struct fadc_dev {
 	struct module *owner;
 };
 
-#define CTL_TRIG_LED	(1 << 6)
-#define CTL_ACQ_LED	(1 << 7)
-
 void fadc_trig_led(struct fadc_dev *dev, int state)
 {
 	int reg;
 
 	reg = readl(dev->spec->remap[0] + FADC_FMC_CSR_ADDR + FADC_R_CTL);
 	if (state)
-		reg |= CTL_TRIG_LED;
+		reg |= (1 << FADC_CTL_TRIG_LED);
 	else
-		reg &= ~CTL_TRIG_LED;
+		reg &= ~(1 << FADC_CTL_TRIG_LED);
 	reg &= FADC_CTL_MASK;
 	writel(reg, dev->spec->remap[0] + FADC_FMC_CSR_ADDR + FADC_R_CTL);
 	reg = readl(dev->spec->remap[0] + FADC_FMC_CSR_ADDR + FADC_R_CTL);
@@ -54,9 +51,9 @@ void fadc_acq_led(struct fadc_dev *dev, int state)
 
 	reg = readl(dev->spec->remap[0] + FADC_FMC_CSR_ADDR + FADC_R_CTL);
 	if (state)
-		reg |= CTL_ACQ_LED;
+		reg |= (1 << FADC_CTL_ACQ_LED);
 	else
-		reg &= ~CTL_ACQ_LED;
+		reg &= ~(1 << FADC_CTL_ACQ_LED);
 	reg &= FADC_CTL_MASK;
 	writel(reg, dev->spec->remap[0] + FADC_FMC_CSR_ADDR + FADC_R_CTL);
 	reg = readl(dev->spec->remap[0] + FADC_FMC_CSR_ADDR + FADC_R_CTL);
