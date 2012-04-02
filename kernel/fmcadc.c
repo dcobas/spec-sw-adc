@@ -15,6 +15,7 @@
 #include <linux/cdev.h>
 #include <linux/fs.h>
 
+#include "fmcadc.h"
 #include "spec.h"
 
 #define FMC_ADC_MAX_DEVICES 32
@@ -34,6 +35,12 @@ struct fadc_dev {
 #define CSR_CTL		0x0
 #define CTL_TRIG_LED	(1 << 6)
 #define CTL_MASK	0xEC
+
+void fadc_init_mezzanine_clock(struct fadc_dev *dev)
+{
+	writel(((1 << FADC_CTL_CLK_EN)|(1 << FADC_CTL_OFFSET_DAC_CLR_N)),
+		dev->spec->remap[2] + FMC_CSR_BASE + FADC_R_CTL);
+}
 
 void fadc_set_frontled(struct fadc_dev *dev, int state)
 {
@@ -155,7 +162,8 @@ static int __devinit fadc_probe(struct platform_device *pdev)
 		goto device_create_fail;
 	}
 
-	fadc_set_frontled(fadcdev, 0);
+	fadc_init_mezzanine_clock(fadcdev);
+	fadc_set_frontled(fadcdev, 1);
 
 	return 0;
 
