@@ -30,6 +30,22 @@ struct fadc_dev {
 	struct module *owner;
 };
 
+#define	FMC_CSR_BASE	0x90000
+#define CSR_CTL		0x0
+#define CTL_TRIG_LED	(1 << 6)
+#define CTL_MASK	0xEC
+
+void fadc_set_frontled(struct fadc_dev *dev)
+{
+	int reg;
+
+	reg = readl(dev->spec->remap[2] + FMC_CSR_BASE + CSR_CTL);
+	/* reg &= ~(1<<self.CTL_TRIG_LED)*/
+	reg |= CTL_TRIG_LED;
+	reg &= CTL_MASK;
+	writel(reg, dev->spec->remap[2] + FMC_CSR_BASE + CSR_CTL);
+}
+
 /* Interrupt handler, currently doint nothing */
 irqreturn_t fadc_irq(int irq, void *dev_id)
 {
@@ -132,6 +148,8 @@ static int __devinit fadc_probe(struct platform_device *pdev)
 		printk(KERN_ERR "error %d creating device %d\n", ret, ndev);
 		goto device_create_fail;
 	}
+
+	fadc_set_frontled(fadcdev);
 
 	return 0;
 
