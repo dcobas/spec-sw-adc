@@ -31,6 +31,19 @@ struct fadc_dev {
 	struct module *owner;
 };
 
+#define FMC_ADC_CHANNEL_1       0
+#define FMC_ADC_CHANNEL_2       1
+#define FMC_ADC_CHANNEL_3       2
+#define FMC_ADC_CHANNEL_4       3
+
+void fmc_adc_set_gain(struct fadc_dev *dev, int channel, int value)
+{
+	int ch_addr;
+
+	ch_addr = FADC_FMC_CSR_ADDR + 0x34 + 0x10*channel;
+	writel(value, dev->spec->remap[0] + ch_addr);
+}
+
 void fadc_trig_led(struct fadc_dev *dev, int state)
 {
 	int reg;
@@ -57,6 +70,16 @@ void fadc_acq_led(struct fadc_dev *dev, int state)
 	reg &= FADC_CTL_MASK;
 	writel(reg, dev->spec->remap[0] + FADC_FMC_CSR_ADDR + FADC_R_CTL);
 	reg = readl(dev->spec->remap[0] + FADC_FMC_CSR_ADDR + FADC_R_CTL);
+}
+
+int fmc_adc_init(struct fadc_dev *dev)
+{
+	fmc_adc_set_gain(dev, FMC_ADC_CHANNEL_1, 0x8000);
+	fmc_adc_set_gain(dev, FMC_ADC_CHANNEL_2, 0x8000);
+	fmc_adc_set_gain(dev, FMC_ADC_CHANNEL_3, 0x8000);
+	fmc_adc_set_gain(dev, FMC_ADC_CHANNEL_4, 0x8000);
+
+	return 0;
 }
 
 /* Interrupt handler, currently doint nothing */
@@ -161,6 +184,8 @@ static int __devinit fadc_probe(struct platform_device *pdev)
 		printk(KERN_ERR "error %d creating device %d\n", ret, ndev);
 		goto device_create_fail;
 	}
+
+	fmc_adc_init(fadcdev);
 
 	return 0;
 
