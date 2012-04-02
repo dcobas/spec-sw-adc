@@ -48,6 +48,8 @@ void fadc_set_frontled(struct fadc_dev *dev, int state)
 	reg &= CTL_MASK;
 	printk("write CSR_CTL=0x%08x\n", reg);
 	writel(reg, dev->spec->remap[2] + FMC_CSR_BASE + CSR_CTL);
+	reg = readl(dev->spec->remap[2] + FMC_CSR_BASE + CSR_CTL);
+	printk("read CSR_CTL=0x%08x\n", reg);
 }
 
 /* Interrupt handler, currently doint nothing */
