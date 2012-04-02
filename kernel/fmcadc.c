@@ -162,9 +162,6 @@ static int __devinit fadc_probe(struct platform_device *pdev)
 		goto device_create_fail;
 	}
 
-	fadc_trig_led(fadcdev, 1);
-	fadc_acq_led(fadcdev, 1);
-
 	return 0;
 
 device_create_fail:
@@ -178,9 +175,6 @@ static int fadc_remove(struct platform_device *pdev)
 	struct fadc_dev *fadcdev;
 
 	fadcdev = pdev->dev.platform_data;
-
-	fadc_trig_led(fadcdev, 0);
-	fadc_acq_led(fadcdev, 0);
 
 	device_destroy(fadc_class, MKDEV(MAJOR(fadc_devno), fadcdev->ndev));
 	cdev_del(&fadcdev->cdev);
