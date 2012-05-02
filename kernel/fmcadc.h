@@ -95,4 +95,63 @@
 #define FADC_RANGE_CAL_1V		0x40
 #define FADC_RANGE_CAL_10V		0x44
 
+void fmc_adc_set_gain(struct fadc_dev *dev, int channel, int value);
+void fadc_trig_led(struct fadc_dev *dev, int state);
+void fadc_acq_led(struct fadc_dev *dev, int state);
+void fmc_adc_set_input_range(struct fadc_dev *dev, int channel, int in_range);
+/* Set SSR register */
+void fmc_adc_set_ssr(struct fadc_dev *dev, int ch, int val);
+/* Get SSR register */
+unsigned int fmc_adc_get_ssr(struct fadc_dev *dev, int ch);
+/* Set trigger configuration */
+void fmc_adc_set_trig_config(struct fadc_dev *dev, unsigned int hw_sel,
+	unsigned int ext_pol, unsigned int hw_en, unsigned int sw_en,
+	unsigned int int_sel, unsigned int int_thres, unsigned int delay);
+/*  Internal trigger */
+void fmc_adc_set_int_trig(struct fadc_dev *dev, int channel, int polarity,
+	int threshold, int int_sel);
+/*  External trigger */
+void fmc_adc_set_ext_trig(struct fadc_dev *dev, int polarity);
+/*  Software trigger */
+void fmc_adc_set_soft_trig(struct fadc_dev *dev);
+/*  Trigger delay */
+void fmc_adc_set_trig_delay(struct fadc_dev *dev, int delay);
+/*  Enable test data */
+void fmc_adc_test_data_en(struct fadc_dev *dev);
+/*  Disable test data */
+void fmc_adc_test_data_dis(struct fadc_dev *dev);
+/*  Get serdes sync status */
+int fmc_adc_get_serdes_sync_stat(struct fadc_dev *dev);
+/*  Start acquisition */
+void fmc_adc_start_acq(struct fadc_dev *dev);
+/*  Stop acquisition */
+void fmc_adc_stop_acq(struct fadc_dev *dev);
+/*  Get acquisition state machine status */
+int fmc_adc_get_acq_fsm_state(struct fadc_dev *dev);
+/*  Software trigger */
+void fmc_adc_sw_trig(struct fadc_dev *dev);
+/*  Software trigger without wait on WAIT_TRIG state */
+void fmc_adc_sw_trig_no_wait(struct fadc_dev *dev);
+/*  Set pre-trigger samples */
+void fmc_adc_set_pretrig_samples(struct fadc_dev *dev, int samples);
+/*  Set post-trigger samples */
+void fmc_adc_set_posttrig_samples(struct fadc_dev *dev, int samples);
+/*  Set number of shots */
+void fmc_adc_set_shots(struct fadc_dev *dev, int shots);
+/*  Get trigger position (DDR address) */
+int fmc_adc_get_trig_pos(struct fadc_dev *dev);
+/*  Get number of acquired samples */
+int fmc_adc_get_nb_samples(struct fadc_dev *dev);
+/*  Get ADC core status */
+int fmc_adc_get_status(struct fadc_dev *dev);
+/*  Get Channel current ADC value */
+int fmc_adc_get_curr_adc_val(struct fadc_dev *dev, int channel);
+/*  Set channel gain and offset correction */
+void fmc_adc_set_gain_off_corr(struct fadc_dev *dev, int channel, int gain,
+	int offset);
+/*  Get channel gain correction */
+int fmc_adc_get_gain_corr(struct fadc_dev *dev, int channel);
+/*  Get channel offset correction */
+int fmc_adc_get_off_corr(struct fadc_dev *dev, int channel);
+
 #endif
