@@ -95,6 +95,8 @@
 #define FADC_RANGE_CAL_1V		0x40
 #define FADC_RANGE_CAL_10V		0x44
 
+struct fadc_dev;
+
 void fmc_adc_set_gain(struct fadc_dev *dev, int channel, int value);
 void fadc_trig_led(struct fadc_dev *dev, int state);
 void fadc_acq_led(struct fadc_dev *dev, int state);
