@@ -14,11 +14,16 @@
 #include <asm/unaligned.h>
 #include <linux/cdev.h>
 #include <linux/fs.h>
+#include <linux/vmalloc.h>
+#include <linux/mutex.h>
+#include <linux/wait.h>
+#include <linux/jiffies.h>
 
 #include "fmcadc.h"
 #include "spec.h"
 
 #define FMC_ADC_MAX_DEVICES 32
+#define FMC_ADC_DEFAULT_BUFSIZE		(1<<20)         /* 1MB */
 
 struct class *fadc_class;
 static dev_t fadc_devno;
@@ -29,6 +34,9 @@ struct fadc_dev {
 	struct cdev cdev;
 	struct device *dev;
 	struct module *owner;
+	struct mutex lock;
+	wait_queue_head_t wait;
+	void *dmabuf;
 };
 
 #define FMC_ADC_CHANNEL_1       0
@@ -43,6 +51,9 @@ unsigned int fmc_adc_channel_addr(int channel, int reg)
 {
 	return (reg + 0x10*channel);
 }
+
+static int fadc_bufsize = FMC_ADC_DEFAULT_BUFSIZE;
+module_param_named(bufsize, fadc_bufsize, int, 0);
 
 void fmc_adc_set_gain(struct fadc_dev *dev, int channel, int value)
 {
@@ -457,15 +468,37 @@ static ssize_t fadc_device_write(struct file *f, const char *buf, size_t count,
 	return 0;
 }
 
-static long fadc_device_ioctl(struct file *f, unsigned int cmd,
-	unsigned long arg)
+static long fadc_device_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
+	int ret = 0;
 	struct fadc_dev *fadcdev;
+	unsigned char __user *buf = (unsigned char __user *)arg;
 
 	fadcdev = f->private_data;
+	mutex_lock(&fadcdev->lock);
 
-	return 0;
+	switch (cmd) {
+	case FADC_ACQUIRE:
+		break;
+	default:
+		break;
+	}
+
+	mutex_unlock(&fadcdev->lock);
+
+	return ret;
 }
+
+int fadc_acquisition(struct fadc_dev *dev)
+{
+	fmc_adc_stop_acq(dev);
+	fmc_adc_start_acq(dev);
+
+	wait_event_timeout(dev->wait,
+		fmc_adc_get_acq_fsm_state(dev) == FADC_FSM_STATE_IDLE, HZ);
+
+}
+
 
 struct file_operations fadc_fops = {
 	.owner = THIS_MODULE,
@@ -491,6 +524,8 @@ static int __devinit fadc_probe(struct platform_device *pdev)
 	cdev_init(&fadcdev->cdev, &fadc_fops);
 	fadcdev->cdev.owner = THIS_MODULE;
 	fadcdev->cdev.ops = &fadc_fops;
+	mutex_init(&fadcdev->lock);
+	init_waitqueue_head(&fadcdev->wait);
 	ret = cdev_add(&fadcdev->cdev, devno, 1);
 	if (ret) {
 		printk(KERN_ERR "error %d adding cdev %d\n", ret, ndev);
@@ -578,6 +613,8 @@ static int fadc_init_probe(struct spec_dev *dev)
 	fadcdev->owner = THIS_MODULE;
 	fadcdev->ndev = fadc_plat_device.id;
 	dev->platdev->dev.platform_data = fadcdev;
+	fadcdev->dmabuf = __vmalloc(fadc_bufsize, GFP_KERNEL | __GFP_ZERO, PAGE_KERNEL);
+	/* TODO: add NULL checks here for kzalloc and vmalloc */
 	platform_device_register(dev->platdev);
 
 	/* increment ID for next time */

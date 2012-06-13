@@ -156,4 +156,9 @@ int fmc_adc_get_gain_corr(struct fadc_dev *dev, int channel);
 /*  Get channel offset correction */
 int fmc_adc_get_off_corr(struct fadc_dev *dev, int channel);
 
+/* ioctl commands */
+#define __FADC_IOC_MAGIC '4' /* random or so */
+
+#define FADC_ACQUIRE		_IOW(__FADC_IOC_MAGIC, 0, unsigned char *)
+
 #endif
