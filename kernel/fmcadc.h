@@ -1,6 +1,10 @@
 #ifndef LINUX_SPEC_FMC_ADC_H
 #define LINUX_SPEC_FMC_ADC_H
 
+#ifdef __KERNEL__
+
+#include <linux/cdev.h>
+
 #define FADC_FMC_SYS_I2C_ADDR	0x60000
 #define FADC_EEPROM_ADDR	0x50
 
@@ -95,7 +99,18 @@
 #define FADC_RANGE_CAL_1V		0x40
 #define FADC_RANGE_CAL_10V		0x44
 
-struct fadc_dev;
+struct fadc_dev {
+	int ndev;
+	struct spec_dev *spec;
+	struct cdev cdev;
+	struct device *dev;
+	struct module *owner;
+	struct mutex lock;
+	unsigned int irqcount;
+	wait_queue_head_t wait;
+	void *dmabuf;
+};
+
 
 void fmc_adc_set_gain(struct fadc_dev *dev, int channel, int value);
 void fadc_trig_led(struct fadc_dev *dev, int state);
@@ -155,6 +170,8 @@ void fmc_adc_set_gain_off_corr(struct fadc_dev *dev, int channel, int gain,
 int fmc_adc_get_gain_corr(struct fadc_dev *dev, int channel);
 /*  Get channel offset correction */
 int fmc_adc_get_off_corr(struct fadc_dev *dev, int channel);
+
+#endif
 
 /* ioctl commands */
 #define __FADC_IOC_MAGIC '4' /* random or so */

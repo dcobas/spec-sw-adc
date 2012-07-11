@@ -43,7 +43,10 @@
 #define DMA_STATUS_ERROR			3
 #define DMA_STATUS_ABORTED			4
 #define DMA_ATTRIB_DIR				1 
+#define DMA_ATTRIB_LAST				0
+#define DMA_ATTRIB_DIR				1
 
+int dma_item_count = 0;
 
 /* GN4124 interrupt configuration */
 void gn_set_interrupt_config(struct spec_dev *spec)
@@ -101,45 +104,44 @@ int gn_set_dma_swap(struct spec_dev *spec, int swap)
  *   dma_last = 1 -> more item in the transfer
  *   Only supports 32-bit host address
  */
-int dma_item_count = 0;
-#if 0
-void gn_add_dma_item(struct spec_dev *spec, unsigned int carrier_addr,
+void gn_add_dma_item(struct fadc_dev *fadcdev, unsigned int carrier_addr,
 	unsigned int host_addr, int length, int dma_dir, int last_item)
 {
-	void *bar0 = spec->remap[0];
+	void *bar0 = fadcdev->spec->remap[0];
 	unsigned int attrib;
+	unsigned int dmalist = page_to_pfn(vmalloc_to_page(fadcdev->dmabuf));
+	unsigned int current_item_addr;
+	unsigned int next_item_addr;
 
 	if (dma_item_count == 0) {
 		/* write the first DMA item in the carrier */
 		writel(carrier_addr, bar0 + R_DMA_CARRIER_START_ADDR);
 		writel((host_addr & 0xFFFFFFFF), bar0 + R_DMA_HOST_START_ADDR_L);
-		writel((host_addr >> 32), bar0 + R_DMA_HOST_START_ADDR_H);
+		writel(0x0, bar0 + R_DMA_HOST_START_ADDR_H);
 		writel(length, bar0 + R_DMA_LENGTH);
-		writel((self.pages[0] & 0xFFFFFFFF), bar0 + R_DMA_NEXT_ITEM_ADDR_L);
+		writel((dmalist & 0xFFFFFFFF), bar0 + R_DMA_NEXT_ITEM_ADDR_L);
 		writel(0x0, bar0 + R_DMA_NEXT_ITEM_ADDR_H);
-		attrib = (dma_dir << self.DMA_ATTRIB_DIR) + (last_item << self.DMA_ATTRIB_LAST)
+		attrib = (dma_dir << DMA_ATTRIB_DIR) + (last_item << DMA_ATTRIB_LAST);
 		writel(attrib, bar0 + R_DMA_ATTRIB);
 	} else {
 		/*
-		 * write nexy DMA item(s) in host memory
+		 * write next DMA item(s) in host memory
 		 * uses page 0 to store DMA items
 		 * current and next item addresses are automatically set
 		 */
-		current_item_addr = (dma_item_count-1)*0x20
-		next_item_addr = (dma_item_count)*0x20
-		writel(self.HOST_BAR, self.HOST_DMA_CARRIER_START_ADDR + current_item_addr, carrier_addr)
-		writel(self.HOST_BAR, self.HOST_DMA_HOST_START_ADDR_L + current_item_addr, host_addr)
-		writel(self.HOST_BAR, self.HOST_DMA_HOST_START_ADDR_H + current_item_addr, 0x0)
-		writel(self.HOST_BAR, self.HOST_DMA_LENGTH + current_item_addr, length)
-		writel(self.HOST_BAR, self.HOST_DMA_NEXT_ITEM_ADDR_L + current_item_addr, self.pages[0] + next_item_addr)
-		self.wr_reg(self.HOST_BAR, self.HOST_DMA_NEXT_ITEM_ADDR_H + current_item_addr, 0x0)
-		attrib = (dma_dir << self.DMA_ATTRIB_DIR) + (last_item << self.DMA_ATTRIB_LAST)
-		self.wr_reg(self.HOST_BAR, self.HOST_DMA_ATTRIB + current_item_addr, attrib)
-		self.dma_item_count += 1
+		current_item_addr = (dma_item_count-1)*0x20;
+		next_item_addr = (dma_item_count)*0x20;
+		*(unsigned int *)(fadcdev->dmabuf + HOST_DMA_CARRIER_START_ADDR + current_item_addr) = carrier_addr;
+		*(unsigned int *)(fadcdev->dmabuf + HOST_DMA_HOST_START_ADDR_L + current_item_addr) = host_addr;
+		*(unsigned int *)(fadcdev->dmabuf + HOST_DMA_HOST_START_ADDR_H + current_item_addr) = 0x0;
+		*(unsigned int *)(fadcdev->dmabuf + HOST_DMA_LENGTH + current_item_addr) = length;
+		*(unsigned int *)(fadcdev->dmabuf + HOST_DMA_NEXT_ITEM_ADDR_L + current_item_addr) = dmalist + next_item_addr;
+		*(unsigned int *)(fadcdev->dmabuf + HOST_DMA_NEXT_ITEM_ADDR_H + current_item_addr) = 0x0;
+		attrib = (dma_dir << DMA_ATTRIB_DIR) + (last_item << DMA_ATTRIB_LAST);
+		*(unsigned int *)(fadcdev->dmabuf + HOST_DMA_ATTRIB + current_item_addr) = attrib;
+		dma_item_count += 1;
 	}
 }
-#endif
-
 
 /* Start DMA transfer */
 void gn_start_dma(struct spec_dev *spec)

@@ -21,23 +21,13 @@
 
 #include "fmcadc.h"
 #include "spec.h"
+#include "gennum.h"
 
 #define FMC_ADC_MAX_DEVICES 32
 #define FMC_ADC_DEFAULT_BUFSIZE		(1<<20)         /* 1MB */
 
 struct class *fadc_class;
 static dev_t fadc_devno;
-
-struct fadc_dev {
-	int ndev;
-	struct spec_dev *spec;
-	struct cdev cdev;
-	struct device *dev;
-	struct module *owner;
-	struct mutex lock;
-	wait_queue_head_t wait;
-	void *dmabuf;
-};
 
 #define FMC_ADC_CHANNEL_1       0
 #define FMC_ADC_CHANNEL_2       1
@@ -468,9 +458,12 @@ static ssize_t fadc_device_write(struct file *f, const char *buf, size_t count,
 	return 0;
 }
 
+int fadc_acquisition(struct fadc_dev *dev);
+
 static long fadc_device_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 {
 	int ret = 0;
+	int i;
 	struct fadc_dev *fadcdev;
 	unsigned char __user *buf = (unsigned char __user *)arg;
 
@@ -479,6 +472,11 @@ static long fadc_device_ioctl(struct file *f, unsigned int cmd, unsigned long ar
 
 	switch (cmd) {
 	case FADC_ACQUIRE:
+		ret = fadc_acquisition(fadcdev);
+		if (ret < 0)
+			return ret;
+		for (i = 0; i < 4096; i++)
+			buf[i] = *((unsigned char *)fadcdev->dmabuf + 4096 + i);
 		break;
 	default:
 		break;
@@ -491,12 +489,33 @@ static long fadc_device_ioctl(struct file *f, unsigned int cmd, unsigned long ar
 
 int fadc_acquisition(struct fadc_dev *dev)
 {
+	int ret = 0;
+	unsigned int count;
+
+	printk(KBUILD_MODNAME ": stopping existing fmc acquisition\n");
 	fmc_adc_stop_acq(dev);
+	printk(KBUILD_MODNAME ": starting fmc acquisition\n");
 	fmc_adc_start_acq(dev);
 
+	printk(KBUILD_MODNAME ": waiting for fmc acquisition to finish\n");
 	wait_event_timeout(dev->wait,
 		fmc_adc_get_acq_fsm_state(dev) == FADC_FSM_STATE_IDLE, HZ);
 
+	printk(KBUILD_MODNAME ": adding dma item to list\n");
+	gn_add_dma_item(dev, 0x100, (unsigned int)dev->dmabuf + 4096, 4096, 0, 0);
+	printk(KBUILD_MODNAME ": starting dma transfer\n");
+	gn_start_dma(dev->spec);
+
+	count = dev->irqcount;
+	printk(KBUILD_MODNAME ": waiting for irq. irqcount = %d\n", count);
+	wait_event_interruptible_timeout(dev->wait, count != dev->irqcount, HZ);
+	printk(KBUILD_MODNAME ": woke up count = %d\n", dev->irqcount);
+	if (signal_pending(current))
+		ret = -ERESTARTSYS;
+
+	printk(KBUILD_MODNAME ": returning\n");
+
+	return ret;
 }
 
 
@@ -594,7 +613,7 @@ static int fadc_init_probe(struct spec_dev *dev)
 	uint32_t val;
 	struct fadc_dev *fadcdev;
 
-	err = request_irq(dev->pdev->irq, fadc_irq, IRQF_SHARED, "wr-nic", dev);
+	err = request_irq(dev->pdev->irq, fadc_irq, IRQF_SHARED, "fmc_adc", dev);
 	if (err < 0) {
 		dev_err(&dev->pdev->dev, "can't request irq %i (err %i)\n",
 				dev->pdev->irq, err);
